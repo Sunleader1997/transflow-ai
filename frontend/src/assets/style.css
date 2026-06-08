@@ -1,0 +1,90 @@
+@import '@vue-flow/core/dist/style.css';
+@import '@vue-flow/core/dist/theme-default.css';
+@import '@vue-flow/controls/dist/style.css';
+@import '@vue-flow/minimap/dist/style.css';
+
+:root {
+  --primary: #1976D2;
+  --secondary: #26A69A;
+  --accent: #9C27B0;
+  --bg: #f3f4f6;
+  --card-bg: #ffffff;
+  --text: #1f2937;
+  --text-secondary: #6b7280;
+  --border: #e5e7eb;
+  --input-node: #169889;
+  --mid-node: #2794b0;
+  --output-node: #1976D2;
+  --neon: #ec4899;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* VueFlow edge animation */
+.vue-flow__edge-path {
+  stroke: var(--secondary);
+  stroke-width: 2;
+  stroke-dasharray: 5, 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+.vue-flow__edge.selected .vue-flow__edge-path {
+  stroke: #f99f00;
+  stroke-width: 3;
+}
+
+/* Node styles */
+.vue-flow__node {
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.vue-flow__node.selected > div {
+  border-color: var(--neon) !important;
+  box-shadow: 0 0 12px var(--neon);
+}
+
+/* Handle styles */
+.vue-flow__handle {
+  width: 12px;
+  height: 12px;
+  background: #999;
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+
+.vue-flow__handle-left {
+  left: -6px;
+}
+
+.vue-flow__handle-right {
+  right: -6px;
+}
+
+/* Controls */
+.vue-flow__controls {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
