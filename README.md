@@ -81,7 +81,8 @@ HTTP-SERVER → [GROOVY / IF-ELSE / ...] → HTTP-BACK
 
 ```
 transflow-ai/
-├── start.sh                    # 一键启动脚本
+├── start.sh                    # 开发环境一键启动脚本
+├── install.sh                  # 生产环境一键安装脚本
 ├── backend/                    # Spring Boot 后端
 │   ├── pom.xml
 │   └── src/main/java/org/sunyaxing/transflow/
@@ -205,10 +206,10 @@ public List<NodeParam> configParams() {
 
 ---
 
-## 快速启动
+## 快速启动（开发）
 
 ```bash
-# 一键启动
+# 一键启动前后端
 ./start.sh
 
 # 或分别启动
@@ -221,8 +222,44 @@ cd frontend && npm install && npm run dev
 | 后端 | http://localhost:8080 |
 | 前端 | http://localhost:5173 |
 
+## 一键安装（生产）
+
+将前端打包进后端 JAR，安装为独立服务：
+
+```bash
+# 构建并安装到 /opt/transflow-ai/
+sudo ./install.sh
+
+# 启停管理
+/opt/transflow-ai/start.sh start    # 启动
+/opt/transflow-ai/start.sh stop     # 停止
+/opt/transflow-ai/start.sh restart  # 重启
+/opt/transflow-ai/start.sh status   # 状态
+
+# 卸载
+/opt/transflow-ai/uninstall.sh
+```
+
+安装目录结构：
+
+```
+/opt/transflow-ai/
+├── transflow-1.0.0.jar             # 应用 JAR（内嵌前端静态资源）
+├── start.sh                         # 启停管理脚本（start/stop/restart/status）
+├── uninstall.sh                     # 卸载脚本
+├── transflow.pid                    # 运行时 PID 文件
+├── config/
+│   └── application.properties       # 外部配置（端口、日志、数据目录等）
+├── logs/
+│   ├── transflow.log                # 应用日志
+│   └── startup.log                  # 启动日志
+└── db/                              # JSON 文件持久化目录
+```
+
+安装后通过 http://localhost:8080 直接访问，前后端同端口，无需额外代理。
+
 ## 环境依赖
 
 - Java 17 (`JAVA_HOME`)
-- Maven 3.9+ (`MAVEN_HOME`, 自定义仓库 `MAVEN_REPOSITORY`)
+- Maven 3.9+（`MAVEN_HOME`，自定义仓库 `MAVEN_REPOSITORY`）
 - Node.js 18+
