@@ -53,6 +53,7 @@ const icon = computed(() => {
     'IF-ELSE': 'call_split',
     'CONSOLE': 'terminal',
     'HTTP-CLIENT': 'send',
+    'HTTP-BACK': 'reply',
     'KAFKA-PRODUCER': 'cloud_upload',
     'SYSLOG-OUTPUT': 'cast',
     'TXT-OUT': 'article'

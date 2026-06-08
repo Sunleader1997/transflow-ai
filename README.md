@@ -14,7 +14,7 @@
 | 脚本 | Groovy | 4.0.18 |
 | 工具 | Hutool, Fastjson2 | - |
 | 持久化 | JSON 文件 (`db/*.json`)，无数据库 | - |
-| 前端 | Vue 3 + VueFlow | 3.x / 1.48.2 |
+| 前端 | Vue 3 + VueFlow + CodeMirror 6 | 3.x / 1.48.2 |
 
 ---
 
@@ -35,27 +35,37 @@
 | 类别 | 类型 | 说明 |
 |------|------|------|
 | INPUT | `TXT-INPUT` | 文本框输入，内嵌输入框 + 发送按钮，Ctrl+Enter 快捷发送 |
-| | `KAFKA-CONSUMER` | Kafka 消费者 |
-| | `HTTP-SERVER` | Netty HTTP 服务端，支持 GET (query 参数) 和 POST (JSON body) |
-| | `SYSLOG-INPUT` | UDP Syslog 接收 |
-| | `FILE` | 文件监听（全量 / TAIL） |
-| | `DIR` | 目录变更监听 |
-| MID | `GROOVY` | Groovy 脚本转换，通过 `data` 变量访问输入数据 |
+| | `KAFKA-CONSUMER` | Kafka 消费者，基于 reactor-kafka 响应式消费 |
+| | `HTTP-SERVER` | Netty HTTP 服务端，支持 GET / POST，输出协议结构化数据 `{"api":"","method":"get","body":{},"requestId":""}` |
+| | `SYSLOG-INPUT` | UDP Syslog 接收，RFC 3164 格式 |
+| | `FILE` | 文件监听，支持 FULL（全量读取）和 TAIL（增量追尾）模式 |
+| | `DIR` | 目录变更监听，基于 WatchService 捕获创建/修改/删除事件 |
+| MID | `GROOVY` | Groovy 脚本转换，通过 `data` 变量访问输入数据，CodeMirror 代码编辑器（亮色主题 + 关键字自动补全） |
 | | `TO-JSON` | 数据格式化为 JSON |
 | | `IF-ELSE` | 条件分支过滤，Groovy 布尔表达式 |
 | OUTPUT | `CONSOLE` | 日志输出 |
-| | `HTTP-CLIENT` | HTTP 客户端调用 |
-| | `KAFKA-PRODUCER` | Kafka 生产者 |
-| | `SYSLOG-OUTPUT` | UDP Syslog 发送 |
+| | `HTTP-CLIENT` | HTTP 客户端调用，支持 GET / POST / PUT |
+| | `HTTP-BACK` | HTTP 响应返回，通过 Groovy 脚本封装返回体（CodeMirror 代码编辑器），将数据返回给 HTTP-SERVER 调用方 |
+| | `KAFKA-PRODUCER` | Kafka 生产者，基于 reactor-kafka 响应式发送 |
+| | `SYSLOG-OUTPUT` | UDP Syslog 发送，RFC 3164 格式 |
 | | `TXT-OUT` | 实时文本展示，仅保留最新一条数据，支持一键复制 |
 
 **连线 (Edge)** — 流动虚线表示数据流向，禁止自连和重复连线，点击可删除
 
-**节点配置** — 后端 `configParams()` 驱动，前端动态渲染表单（`text` / `textarea` / `number` / `select` / `hint`），新增节点类型无需改前端
+**节点配置** — 后端 `configParams()` 驱动，前端动态渲染表单（`text` / `number` / `select` / `hint` / `code` / `groovy` / `json` / `boolean` / `password` / `list`），新增节点类型无需改前端
 
 ### 数据流处理
 
 基于 Project Reactor 的响应式数据管道，使用 `Sinks.Many` 实现背压感知的流式处理，支持任意类型数据（二进制 / 文本 / JSON）的链式处理。
+
+### HTTP 请求-响应闭环
+
+`HTTP-SERVER` 接收请求后输出协议结构化数据，请求上下文通过 `HttpRequestContext` 注册表关联。下游节点（如 `HTTP-BACK`）通过 `requestId` 完成响应闭环，将处理结果返回给调用方：
+
+```
+HTTP-SERVER → [GROOVY / IF-ELSE / ...] → HTTP-BACK
+  收到请求        数据处理/路由            封装响应返回客户端
+```
 
 ### 节点状态
 
@@ -78,7 +88,7 @@ transflow-ai/
 │       ├── TransflowApplication.java        # 入口，Spring Boot 启动
 │       ├── config/
 │       │   ├── WebConfig.java               # WebFlux CORS 配置
-│       │   ├── ProcessorConfig.java         # 处理器注册（14 种节点类型）
+│       │   ├── ProcessorConfig.java         # 处理器注册（15 种节点类型）
 │       │   └── StartupRunner.java           # 启动时自动恢复所有任务
 │       ├── model/
 │       │   ├── Task.java                    # 任务模型
@@ -100,19 +110,21 @@ transflow-ai/
 │           └── processors/
 │               ├── NodeProcessor.java       # 处理器接口（configParams + process + destroy）
 │               ├── NodeProcessorFactory.java # 处理器工厂，类型注册 + 实例创建
+│               ├── HttpRequestContext.java   # HTTP 请求-响应上下文注册表
 │               ├── TxtInputProcessor.java   # TXT-INPUT
-│               ├── KafkaConsumerProcessor.java
-│               ├── HttpServerProcessor.java  # HTTP-SERVER (GET + POST)
-│               ├── SyslogInputProcessor.java
-│               ├── FileProcessor.java
-│               ├── DirProcessor.java
-│               ├── GroovyProcessor.java     # GROOVY
+│               ├── KafkaConsumerProcessor.java # KAFKA-CONSUMER（reactor-kafka）
+│               ├── HttpServerProcessor.java  # HTTP-SERVER（协议结构化输出 + requestId）
+│               ├── SyslogInputProcessor.java # SYSLOG-INPUT（UDP 接收）
+│               ├── FileProcessor.java       # FILE（FULL / TAIL 模式）
+│               ├── DirProcessor.java        # DIR（WatchService 目录监听）
+│               ├── GroovyProcessor.java     # GROOVY（脚本转换，代码编辑器）
 │               ├── ToJsonProcessor.java     # TO-JSON
-│               ├── IfElseProcessor.java     # IF-ELSE
+│               ├── IfElseProcessor.java     # IF-ELSE（条件过滤，代码编辑器）
 │               ├── ConsoleProcessor.java    # CONSOLE
-│               ├── HttpClientProcessor.java  # HTTP-CLIENT
-│               ├── KafkaProducerProcessor.java
-│               ├── SyslogOutputProcessor.java
+│               ├── HttpClientProcessor.java  # HTTP-CLIENT（GET / POST / PUT）
+│               ├── HttpBackProcessor.java   # HTTP-BACK（Groovy 封装响应返回）
+│               ├── KafkaProducerProcessor.java # KAFKA-PRODUCER（reactor-kafka）
+│               ├── SyslogOutputProcessor.java # SYSLOG-OUTPUT（UDP 发送）
 │               └── TxtOutProcessor.java     # TXT-OUT（仅保留最新一条）
 ├── frontend/                   # Vue 3 前端
 │   ├── package.json
@@ -126,7 +138,8 @@ transflow-ai/
 │       │   └── FlowEditor.vue              # 流程编排编辑器，拖拽节点、连线
 │       ├── components/
 │       │   ├── FlowNode.vue                # 自定义节点，内嵌输入框 / 实时输出 / 状态指示器
-│       │   └── NodeConfig.vue              # 节点配置面板，双击弹出，动态表单
+│       │   ├── NodeConfig.vue              # 节点配置面板，双击弹出，动态表单
+│       │   └── GroovyCodeEditor.vue        # CodeMirror 6 代码编辑器，亮色主题，自动补全
 │       └── assets/
 │           └── style.css                   # 全局主题 + VueFlow 边动画 + 霓虹灯选中效果
 ```
@@ -158,11 +171,13 @@ public List<NodeParam> configParams() {
 |------|------|
 | `field` | 参数名（config Map 的 key） |
 | `label` | 前端显示标签 |
-| `type` | 控件类型（text / textarea / number / select / hint） |
+| `type` | 控件类型（`text` / `number` / `select` / `hint` / `code` / `groovy` / `json` / `boolean` / `password` / `list`） |
 | `defaultValue` | 默认值 |
 | `placeholder` | 占位提示 |
 | `hint` | 底部说明文字 |
 | `options` | select 控件选项列表 |
+
+其中 `code` 和 `groovy` 类型在前端渲染为 CodeMirror 6 代码编辑器（亮色主题、行号、代码折叠、Groovy/JS 语法高亮、`data` / `requestId` 变量自动补全 + Groovy 关键字补全），`json` 类型渲染为 JSON 编辑器。
 
 ---
 
@@ -173,7 +188,8 @@ public List<NodeParam> configParams() {
 | `views/TaskList.vue` | 任务列表页，浅色主题，统计栏 |
 | `views/FlowEditor.vue` | 流程编排编辑器，拖拽节点、连线 |
 | `components/FlowNode.vue` | 自定义节点，TXT-INPUT 内嵌输入框 + 发送按钮，TXT-OUT 显示最新输出 |
-| `components/NodeConfig.vue` | 节点配置面板，双击弹出，动态表单 |
+| `components/NodeConfig.vue` | 节点配置面板，双击弹出，动态表单，`code` 类型渲染为代码编辑器 |
+| `components/GroovyCodeEditor.vue` | CodeMirror 6 代码编辑器，亮色主题，`data` / `requestId` 自动补全 |
 | `api/index.js` | Axios API 封装 |
 | `assets/style.css` | 全局主题 + VueFlow 边动画 |
 
@@ -183,7 +199,7 @@ public List<NodeParam> configParams() {
 - 双击节点打开配置
 - 选中节点 Backspace 删除（连带清理连线）
 - 点击连线删除
-- Ctrl+S 保存流程
+- Ctrl+S 保存流程，顶部通知条提示保存成功 / 失败
 - TXT-INPUT 节点内嵌输入框，点击发送或 Ctrl+Enter 注入数据
 - TXT-OUT 实时轮询最新一条数据 + 一键复制
 

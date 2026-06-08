@@ -1,5 +1,8 @@
 <template>
   <div class="task-list">
+    <transition name="toast">
+      <div v-if="toast.show" :class="['toast-bar', toast.type]">{{ toast.message }}</div>
+    </transition>
     <header class="header">
       <h1>TRANSFLOW 灵流</h1>
       <p class="subtitle">灵活编排的数据分发系统</p>
@@ -62,8 +65,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { taskApi } from '../api/index.js'
+import { useToast } from '../composables/useToast.js'
 
 const tasks = ref([])
+const { toast, showToast } = useToast()
 const showCreate = ref(false)
 const showEdit = ref(false)
 const editingId = ref(null)
@@ -77,13 +82,19 @@ const loadTasks = async () => {
 }
 
 const saveTask = async () => {
-  if (showEdit.value) {
-    await taskApi.update(editingId.value, form.value)
-  } else {
-    await taskApi.create(form.value)
+  try {
+    if (showEdit.value) {
+      await taskApi.update(editingId.value, form.value)
+      showToast('任务已更新')
+    } else {
+      await taskApi.create(form.value)
+      showToast('任务已创建')
+    }
+    closeModal()
+    loadTasks()
+  } catch (e) {
+    showToast('操作失败', 'error')
   }
-  closeModal()
-  loadTasks()
 }
 
 const editTask = (task) => {
@@ -94,8 +105,13 @@ const editTask = (task) => {
 
 const deleteTask = async (id) => {
   if (confirm('确定删除此任务？')) {
-    await taskApi.delete(id)
-    loadTasks()
+    try {
+      await taskApi.delete(id)
+      showToast('任务已删除')
+      loadTasks()
+    } catch (e) {
+      showToast('删除失败', 'error')
+    }
   }
 }
 
@@ -147,4 +163,10 @@ onMounted(loadTasks)
 .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; }
 .form-group input:focus, .form-group textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.toast-bar { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 200; padding: 10px 28px; border-radius: 0 0 8px 8px; font-size: 14px; font-weight: 500; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
+.toast-bar.success { background: #4caf50; color: #fff; }
+.toast-bar.error { background: #f44336; color: #fff; }
+.toast-enter-active { transition: all 0.25s ease-out; }
+.toast-leave-active { transition: all 0.2s ease-in; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-100%); }
 </style>

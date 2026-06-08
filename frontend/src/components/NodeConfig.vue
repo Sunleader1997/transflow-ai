@@ -28,6 +28,12 @@
           <select v-else-if="param.type === 'select'" v-model="localConfig[param.field]">
             <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
           </select>
+          <GroovyCodeEditor
+            v-else-if="param.type === 'code'"
+            v-model="localConfig[param.field]"
+            :placeholder="param.placeholder"
+            height="300px"
+          />
           <div v-else-if="param.type === 'hint'" class="hint-text">{{ param.hint }}</div>
           <p class="param-hint" v-if="param.hint && param.type !== 'hint'">{{ param.hint }}</p>
         </div>
@@ -43,6 +49,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { flowApi } from '../api/index.js'
+import GroovyCodeEditor from './GroovyCodeEditor.vue'
 
 const props = defineProps(['node', 'configParams'])
 const emit = defineEmits(['close', 'save'])
@@ -99,7 +106,7 @@ const getDefaultParams = (type) => {
       { field: 'path', label: '目录路径', type: 'text', defaultValue: '', placeholder: '/path/to/dir' }
     ],
     'GROOVY': [
-      { field: 'script', label: 'Groovy 脚本', type: 'textarea', defaultValue: '', placeholder: 'def result = data; return result;' }
+      { field: 'script', label: 'Groovy 脚本', type: 'code', defaultValue: '// data 为输入数据\ndef result = data\nreturn result', placeholder: 'def result = data\nreturn result' }
     ],
     'TO-JSON': [],
     'IF-ELSE': [
@@ -111,6 +118,9 @@ const getDefaultParams = (type) => {
     'HTTP-CLIENT': [
       { field: 'url', label: 'URL', type: 'text', defaultValue: '', placeholder: 'https://example.com/api' },
       { field: 'method', label: 'Method', type: 'select', defaultValue: 'POST', options: ['POST', 'GET', 'PUT'] }
+    ],
+    'HTTP-BACK': [
+      { field: 'script', label: '响应脚本', type: 'code', defaultValue: '// data 为上游传入数据，requestId 为请求追溯 ID\nreturn ["code": 200, "message": "success", "data": data]', placeholder: 'return ["code": 200, "message": "success", "data": data]' }
     ],
     'KAFKA-PRODUCER': [
       { field: 'bootstrapServers', label: 'Bootstrap Servers', type: 'text', defaultValue: 'localhost:9092', placeholder: 'localhost:9092' },
@@ -134,7 +144,7 @@ loadParams()
 
 <style scoped>
 .config-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; }
-.config-panel { background: #fff; border-radius: 12px; width: 440px; max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+.config-panel { background: #fff; border-radius: 12px; width: 680px; max-width: 90vw; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
 .config-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
 .config-header h3 { font-size: 16px; }
 .close-btn { border: none; background: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); }

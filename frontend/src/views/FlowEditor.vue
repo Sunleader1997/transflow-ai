@@ -1,5 +1,8 @@
 <template>
   <div class="flow-editor">
+    <transition name="toast">
+      <div v-if="toast.show" :class="['toast-bar', toast.type]">{{ toast.message }}</div>
+    </transition>
     <header class="editor-header">
       <button class="btn" @click="$router.push('/tasks')">&#8592; 返回</button>
       <h2>{{ taskName }}</h2>
@@ -77,6 +80,7 @@ import { MiniMap } from '@vue-flow/minimap'
 import { flowApi, flowDataApi } from '../api/index.js'
 import FlowNode from '../components/FlowNode.vue'
 import NodeConfig from '../components/NodeConfig.vue'
+import { useToast } from '../composables/useToast.js'
 
 const route = useRoute()
 const taskId = route.params.taskId
@@ -87,6 +91,8 @@ const edges = ref([])
 const configNode = ref(null)
 const configParams = ref([])
 const vueFlowRef = ref(null)
+
+const { toast, showToast } = useToast()
 
 let statusTimer = null
 let outputTimer = null
@@ -122,6 +128,7 @@ const categories = [
     types: [
       { type: 'CONSOLE', label: '日志输出', desc: '控制台日志输出', icon: 'terminal' },
       { type: 'HTTP-CLIENT', label: 'HTTP 客户端', desc: 'HTTP 客户端调用', icon: 'send' },
+      { type: 'HTTP-BACK', label: 'HTTP 回调', desc: 'HTTP 响应回调', icon: 'reply' },
       { type: 'KAFKA-PRODUCER', label: 'Kafka 生产者', desc: 'Kafka 消息生产', icon: 'cloud_upload' },
       { type: 'SYSLOG-OUTPUT', label: 'Syslog 输出', desc: 'UDP Syslog 发送', icon: 'cast' },
       { type: 'TXT-OUT', label: '文本输出', desc: '实时文本展示', icon: 'article' }
@@ -182,11 +189,12 @@ const getDefaultConfig = (type) => {
     'SYSLOG-INPUT': { port: '514' },
     'FILE': { path: '', mode: 'TAIL' },
     'DIR': { path: '' },
-    'GROOVY': { script: '' },
+    'GROOVY': { script: '// data 为输入数据\ndef result = data\nreturn result' },
     'TO-JSON': {},
     'IF-ELSE': { condition: '' },
     'CONSOLE': { prefix: '[TransFlow]' },
     'HTTP-CLIENT': { url: '', method: 'POST' },
+    'HTTP-BACK': { script: '// data 为上游传入数据，requestId 为请求追溯 ID\nreturn ["code": 200, "message": "success", "data": data]' },
     'KAFKA-PRODUCER': { bootstrapServers: 'localhost:9092', topic: '' },
     'SYSLOG-OUTPUT': { host: 'localhost', port: '514' },
     'TXT-OUT': {}
@@ -252,13 +260,16 @@ const openConfig = async (nodeId) => {
 
 const onSendData = async ({ nodeId, text }) => {
   const lines = text.split('\n').filter(l => l.trim())
+  let success = 0
   for (const line of lines) {
     try {
       await flowDataApi.emit(taskId, nodeId, line.trim())
+      success++
     } catch (e) {
       console.error('Emit failed:', e)
     }
   }
+  if (success > 0) showToast(`已发送 ${success} 条数据`)
 }
 
 const saveNodeConfig = (nodeId, config) => {
@@ -267,6 +278,7 @@ const saveNodeConfig = (nodeId, config) => {
     node.data.config = { ...node.data.config, ...config }
   }
   configNode.value = null
+  showToast('节点配置已保存')
 }
 
 const saveFlow = async () => {
@@ -288,8 +300,10 @@ const saveFlow = async () => {
       }))
     }
     await flowApi.save(taskId, flow)
+    showToast('保存成功')
   } catch (e) {
     console.error('Save failed:', e)
+    showToast('保存失败', 'error')
   }
 }
 
@@ -397,4 +411,10 @@ onBeforeUnmount(() => {
 .btn { padding: 10px 20px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 14px; background: #fff; }
 .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn-primary:hover { opacity: 0.9; }
+.toast-bar { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 200; padding: 10px 28px; border-radius: 0 0 8px 8px; font-size: 14px; font-weight: 500; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
+.toast-bar.success { background: #4caf50; color: #fff; }
+.toast-bar.error { background: #f44336; color: #fff; }
+.toast-enter-active { transition: all 0.25s ease-out; }
+.toast-leave-active { transition: all 0.2s ease-in; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-100%); }
 </style>

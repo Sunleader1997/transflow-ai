@@ -5,7 +5,7 @@ import java.util.List;
 public enum NodeType {
     INPUT("TXT-INPUT", "KAFKA-CONSUMER", "HTTP-SERVER", "SYSLOG-INPUT", "FILE", "DIR"),
     MID("GROOVY", "TO-JSON", "IF-ELSE"),
-    OUTPUT("CONSOLE", "HTTP-CLIENT", "KAFKA-PRODUCER", "SYSLOG-OUTPUT", "TXT-OUT");
+    OUTPUT("CONSOLE", "HTTP-CLIENT", "HTTP-BACK", "KAFKA-PRODUCER", "SYSLOG-OUTPUT", "TXT-OUT");
 
     private final List<String> types;
 

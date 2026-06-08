@@ -31,6 +31,7 @@ public class ProcessorConfig {
         // OUTPUT
         factory.register("CONSOLE", ConsoleProcessor::new);
         factory.register("HTTP-CLIENT", HttpClientProcessor::new);
+        factory.register("HTTP-BACK", HttpBackProcessor::new);
         factory.register("KAFKA-PRODUCER", KafkaProducerProcessor::new);
         factory.register("SYSLOG-OUTPUT", SyslogOutputProcessor::new);
         factory.register("TXT-OUT", TxtOutProcessor::new);

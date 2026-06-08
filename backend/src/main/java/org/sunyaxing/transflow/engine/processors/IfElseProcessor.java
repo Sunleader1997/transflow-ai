@@ -17,7 +17,7 @@ public class IfElseProcessor implements NodeProcessor {
     @Override
     public List<NodeParam> configParams() {
         return List.of(
-            new NodeParam("condition", "条件表达式", "text", "",
+            new NodeParam("condition", "条件表达式", "groovy", "",
                 "data.status == 1", "Groovy 布尔表达式，返回 true 放行，false 丢弃", null)
         );
     }

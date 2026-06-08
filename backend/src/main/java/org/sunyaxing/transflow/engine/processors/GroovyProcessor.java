@@ -18,8 +18,8 @@ public class GroovyProcessor implements NodeProcessor {
     @Override
     public List<NodeParam> configParams() {
         return List.of(
-            new NodeParam("script", "Groovy 脚本", "textarea", "",
-                "def result = data; return result;", "使用 data 变量访问输入数据", null)
+            new NodeParam("script", "Groovy 脚本", "groovy", "",
+                "def result = data\nreturn result", "使用 data 变量访问输入数据", null)
         );
     }
 

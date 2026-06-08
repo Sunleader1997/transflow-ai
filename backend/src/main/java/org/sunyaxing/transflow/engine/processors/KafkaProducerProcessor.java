@@ -1,10 +1,16 @@
 package org.sunyaxing.transflow.engine.processors;
 
 import com.alibaba.fastjson2.JSON;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sunyaxing.transflow.model.NodeParam;
 import reactor.core.publisher.Mono;
+import reactor.kafka.sender.KafkaSender;
+import reactor.kafka.sender.SenderOptions;
+import reactor.kafka.sender.SenderRecord;
 
 import java.util.List;
 import java.util.Map;
@@ -12,6 +18,9 @@ import java.util.Map;
 public class KafkaProducerProcessor implements NodeProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaProducerProcessor.class);
+
+    private KafkaSender<String, String> sender;
+    private String topic;
 
     @Override
     public String getType() { return "KAFKA-PRODUCER"; }
@@ -26,19 +35,44 @@ public class KafkaProducerProcessor implements NodeProcessor {
 
     @Override
     public Mono<Void> init(String nodeId, Map<String, Object> config) {
-        // Kafka producer placeholder
-        // In production, create reactive Kafka sender here
-        return Mono.empty();
+        return Mono.fromRunnable(() -> {
+            String bootstrapServers = config.getOrDefault("bootstrapServers", "localhost:9092").toString();
+            this.topic = config.getOrDefault("topic", "").toString();
+
+            if (topic.isBlank()) {
+                throw new IllegalArgumentException("Kafka topic is required");
+            }
+
+            Map<String, Object> props = Map.of(
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
+                ProducerConfig.ACKS_CONFIG, "all"
+            );
+
+            SenderOptions<String, String> options = SenderOptions.create(props);
+            this.sender = KafkaSender.create(options);
+
+            log.info("[KafkaProducer] Initialized, servers={}, topic={}", bootstrapServers, topic);
+        });
     }
 
     @Override
     public Mono<Object> process(Object data) {
-        return Mono.fromRunnable(() -> {
-            String value = data instanceof String s ? s : JSON.toJSONString(data);
-            log.info("[KafkaProducer] Sending: {}", value);
-        }).then(Mono.justOrEmpty(data));
+        String value = data instanceof String s ? s : JSON.toJSONString(data);
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, value);
+        return sender.send(Mono.just(SenderRecord.create(record, null)))
+            .doOnNext(result -> log.debug("[KafkaProducer] Sent to {}@{}", topic, result.recordMetadata().offset()))
+            .doOnError(err -> log.error("[KafkaProducer] Send error: {}", err.getMessage()))
+            .single()
+            .thenReturn(data);
     }
 
     @Override
-    public void destroy() {}
+    public void destroy() {
+        if (sender != null) {
+            sender.close();
+        }
+        log.info("[KafkaProducer] Stopped, topic={}", topic);
+    }
 }

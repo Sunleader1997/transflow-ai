@@ -1,12 +1,13 @@
 package org.sunyaxing.transflow.engine.processors;
 
+import com.alibaba.fastjson2.JSON;
 import org.sunyaxing.transflow.model.NodeParam;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Schedulers;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,37 +33,32 @@ public class HttpServerProcessor implements NodeProcessor {
         String path = (String) config.getOrDefault("path", "/api/data");
         dataSink = Sinks.many().multicast().onBackpressureBuffer(256, false);
 
-        // Use boundedElastic scheduler for blocking bindNow() operation
         return Mono.fromCallable(() -> {
             server = HttpServer.create()
                     .port(port)
                     .route(routes -> routes
                         .post(path, (req, res) ->
                             req.receive().aggregate().asString()
-                                .doOnNext(body -> {
-                                    try {
-                                        @SuppressWarnings("unchecked")
-                                        Map<String, Object> obj = com.alibaba.fastjson2.JSON.parseObject(body, Map.class);
-                                        dataSink.tryEmitNext(obj);
-                                    } catch (Exception e) {
-                                        dataSink.tryEmitNext(body);
-                                    }
+                                .flatMap(body -> {
+                                    String requestId = HttpRequestContext.createPendingResponse();
+                                    Map<String, Object> envelope = buildEnvelope(path, "POST", body, requestId);
+                                    dataSink.tryEmitNext(envelope);
+                                    HttpRequestContext.PendingResponse pending = HttpRequestContext.getPending(requestId);
+                                    return pending.asMono()
+                                        .doFinally(signal -> HttpRequestContext.removePending(requestId))
+                                        .flatMap(responseBody -> res.sendString(Mono.just(responseBody)).then())
+                                        .onErrorResume(err -> res.status(500).sendString(Mono.just(err.getMessage())).then());
                                 })
-                                .then(Mono.defer(() -> res.sendString(Mono.just("OK")).then()))
                         )
                         .get(path, (req, res) -> {
-                            Map<String, Object> params = new java.util.HashMap<>();
-                            String uri = req.uri();
-                            int qi = uri.indexOf('?');
-                            if (qi >= 0) {
-                                String query = uri.substring(qi + 1);
-                                for (String pair : query.split("&")) {
-                                    String[] kv = pair.split("=", 2);
-                                    params.put(kv[0], kv.length > 1 ? kv[1] : "");
-                                }
-                            }
-                            dataSink.tryEmitNext(params);
-                            return res.sendString(Mono.just("OK"));
+                            String requestId = HttpRequestContext.createPendingResponse();
+                            Map<String, Object> envelope = buildEnvelopeFromQuery(path, req.uri(), requestId);
+                            dataSink.tryEmitNext(envelope);
+                            HttpRequestContext.PendingResponse pending = HttpRequestContext.getPending(requestId);
+                            return pending.asMono()
+                                .doFinally(signal -> HttpRequestContext.removePending(requestId))
+                                .flatMap(responseBody -> res.sendString(Mono.just(responseBody)).then())
+                                .onErrorResume(err -> res.status(500).sendString(Mono.just(err.getMessage())).then());
                         })
                     )
                     .bindNow();
@@ -83,5 +79,36 @@ public class HttpServerProcessor implements NodeProcessor {
         if (dataSink != null) {
             dataSink.tryEmitComplete();
         }
+    }
+
+    private Map<String, Object> buildEnvelope(String api, String method, String body, String requestId) {
+        Map<String, Object> envelope = new HashMap<>();
+        envelope.put("api", api);
+        envelope.put("method", method.toLowerCase());
+        envelope.put("requestId", requestId);
+        try {
+            envelope.put("body", JSON.parseObject(body, Map.class));
+        } catch (Exception e) {
+            envelope.put("body", body);
+        }
+        return envelope;
+    }
+
+    private Map<String, Object> buildEnvelopeFromQuery(String api, String uri, String requestId) {
+        Map<String, Object> envelope = new HashMap<>();
+        envelope.put("api", api);
+        envelope.put("method", "get");
+        envelope.put("requestId", requestId);
+        Map<String, Object> params = new HashMap<>();
+        int qi = uri.indexOf('?');
+        if (qi >= 0) {
+            String query = uri.substring(qi + 1);
+            for (String pair : query.split("&")) {
+                String[] kv = pair.split("=", 2);
+                params.put(kv[0], kv.length > 1 ? kv[1] : "");
+            }
+        }
+        envelope.put("body", params);
+        return envelope;
     }
 }

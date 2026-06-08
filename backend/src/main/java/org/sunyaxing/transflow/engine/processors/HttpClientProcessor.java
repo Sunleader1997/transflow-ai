@@ -37,23 +37,32 @@ public class HttpClientProcessor implements NodeProcessor {
             return Mono.justOrEmpty(data);
         }
         String body = data instanceof String s ? s : JSON.toJSONString(data);
-        return HttpClient.create()
+        reactor.netty.http.client.HttpClient client = HttpClient.create()
                 .headers(h -> h.set("Content-Type", "application/json"))
-                .baseUrl(url)
-                .post()
-                .send((req, out) -> out.sendString(Mono.just(body)))
-                .responseSingle((res, bytes) ->
-                    bytes.asString().map(b -> {
-                        try {
-                            return JSON.parse(b);
-                        } catch (Exception e) {
-                            return Map.of("raw", (Object) b);
-                        }
-                    })
-                )
-                .onErrorResume(err ->
-                    Mono.just(Map.of("error", (Object) err.getMessage()))
-                );
+                .baseUrl(url);
+        Mono<?> responseMono;
+        if ("GET".equals(method)) {
+            // get() returns ResponseReceiver directly (no body to send)
+            responseMono = client.get()
+                    .responseSingle((res, bytes) -> bytes.asString().map(b -> {
+                        try { return JSON.parse(b); } catch (Exception e) { return Map.of("raw", (Object) b); }
+                    }));
+        } else if ("PUT".equals(method)) {
+            responseMono = client.put()
+                    .send((req, out) -> out.sendString(Mono.just(body)))
+                    .responseSingle((res, bytes) -> bytes.asString().map(b -> {
+                        try { return JSON.parse(b); } catch (Exception e) { return Map.of("raw", (Object) b); }
+                    }));
+        } else {
+            responseMono = client.post()
+                    .send((req, out) -> out.sendString(Mono.just(body)))
+                    .responseSingle((res, bytes) -> bytes.asString().map(b -> {
+                        try { return JSON.parse(b); } catch (Exception e) { return Map.of("raw", (Object) b); }
+                    }));
+        }
+        return responseMono
+                .map(r -> (Object) r)
+                .onErrorResume(err -> Mono.just(Map.of("error", (Object) err.getMessage())));
     }
 
     @Override
