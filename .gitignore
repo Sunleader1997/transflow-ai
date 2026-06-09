@@ -10,3 +10,4 @@ logs/
 *.pid
 .DS_Store
 .idea/
+/target/
