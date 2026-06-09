@@ -15,7 +15,7 @@ import reactor.kafka.sender.SenderRecord;
 import java.util.List;
 import java.util.Map;
 
-public class KafkaProducerProcessor implements NodeProcessor {
+public class KafkaProducerProcessor extends AbstractNodeProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaProducerProcessor.class);
 
@@ -52,6 +52,7 @@ public class KafkaProducerProcessor implements NodeProcessor {
 
             SenderOptions<String, String> options = SenderOptions.create(props);
             this.sender = KafkaSender.create(options);
+            initInputSink();
 
             log.info("[KafkaProducer] Initialized, servers={}, topic={}", bootstrapServers, topic);
         });
@@ -70,6 +71,7 @@ public class KafkaProducerProcessor implements NodeProcessor {
 
     @Override
     public void destroy() {
+        destroyInputSink();
         if (sender != null) {
             sender.close();
         }

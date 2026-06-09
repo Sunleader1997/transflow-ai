@@ -3,6 +3,7 @@ package org.sunyaxing.transflow.engine.processors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sunyaxing.transflow.model.NodeParam;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class DirProcessor implements NodeProcessor {
+public class DirProcessor extends AbstractNodeProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(DirProcessor.class);
 
@@ -88,6 +89,11 @@ public class DirProcessor implements NodeProcessor {
             return Mono.justOrEmpty(data);
         }
         return Mono.from(dataSink.asFlux());
+    }
+
+    @Override
+    public Flux<Object> output() {
+        return dataSink.asFlux();
     }
 
     @Override

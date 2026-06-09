@@ -8,7 +8,7 @@ import reactor.netty.http.client.HttpClient;
 import java.util.List;
 import java.util.Map;
 
-public class HttpClientProcessor implements NodeProcessor {
+public class HttpClientProcessor extends AbstractNodeProcessor {
 
     private String url;
     private String method;
@@ -28,6 +28,7 @@ public class HttpClientProcessor implements NodeProcessor {
     public Mono<Void> init(String nodeId, Map<String, Object> config) {
         this.url = (String) config.getOrDefault("url", "");
         this.method = ((String) config.getOrDefault("method", "POST")).toUpperCase();
+        initInputSink();
         return Mono.empty();
     }
 
@@ -66,5 +67,7 @@ public class HttpClientProcessor implements NodeProcessor {
     }
 
     @Override
-    public void destroy() {}
+    public void destroy() {
+        destroyInputSink();
+    }
 }

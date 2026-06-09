@@ -11,11 +11,8 @@ import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class FlowEngine {
@@ -26,9 +23,6 @@ public class FlowEngine {
     private final NodeProcessorFactory factory;
     private final Map<String, NodeProcessor> processors = new HashMap<>();
     private final Map<String, Node> nodeMap = new HashMap<>();
-    private final Map<String, List<String>> adjacency = new HashMap<>();
-    private final Map<String, Sinks.Many<Object>> sinks = new ConcurrentHashMap<>();
-    private final Map<String, NodeStatus> statuses = new ConcurrentHashMap<>();
     private final List<Disposable> subscriptions = new CopyOnWriteArrayList<>();
     private volatile boolean running = false;
 
@@ -45,29 +39,24 @@ public class FlowEngine {
         processors.values().forEach(NodeProcessor::destroy);
         processors.clear();
         nodeMap.clear();
-        adjacency.clear();
 
-        // Complete old sinks and create fresh ones
-        sinks.values().forEach(s -> s.tryEmitComplete());
-        sinks.clear();
-
-        // Build adjacency first (synchronous)
+        // 先收集 edges → targets 映射（sourceId → [targetId, ...]）
+        Map<String, List<String>> edgeMap = new HashMap<>();
         for (Edge edge : edges) {
-            adjacency.computeIfAbsent(edge.getSource(), k -> new ArrayList<>())
+            edgeMap.computeIfAbsent(edge.getSource(), k -> new ArrayList<>())
                     .add(edge.getTarget());
         }
 
-        // Create processors sequentially to avoid concurrent HashMap writes
+        // 创建处理器，将 targets 绑定到处理器自身
+        Map<String, List<String>> finalEdgeMap = edgeMap;
         return Flux.fromIterable(nodes)
             .concatMap(node -> {
                 nodeMap.put(node.getId(), node);
-                sinks.put(node.getId(),
-                    Sinks.many().multicast().onBackpressureBuffer(256, false));
-                NodeStatus status = node.getStatus() != null ? node.getStatus() : new NodeStatus();
-                statuses.put(node.getId(), status);
-
                 return factory.create(node)
-                    .doOnSuccess(processor -> processors.put(node.getId(), processor));
+                    .doOnSuccess(processor -> {
+                        processor.setTargets(finalEdgeMap.getOrDefault(node.getId(), List.of()));
+                        processors.put(node.getId(), processor);
+                    });
             })
             .then();
     }
@@ -77,100 +66,76 @@ public class FlowEngine {
         running = true;
         log.info("FlowEngine started for task {}", taskId);
 
+        // 第一步：为所有节点绑定输出流订阅（output → 推入下游 inputSink）
+        for (Node node : nodeMap.values()) {
+            bindNode(node);
+        }
+
+        // 第二步：启动 INPUT 节点的数据生产
         for (Node node : nodeMap.values()) {
             if (node.getNodeType() == NodeType.INPUT) {
-                NodeProcessor processor = processors.get(node.getId());
-                startInputNode(node.getId(), processor);
-            }
-
-            List<String> targets = adjacency.getOrDefault(node.getId(), List.of());
-            Sinks.Many<Object> sink = sinks.get(node.getId());
-            if (sink != null && !targets.isEmpty()) {
-                Disposable d = sink.asFlux()
-                    .flatMap(data -> {
-                        NodeProcessor proc = processors.get(node.getId());
-                        if (proc == null) return Mono.empty();
-                        incrementRec(node.getId());
-                        return proc.process(data)
-                            .doOnSuccess(result -> incrementSend(node.getId()))
-                            .onErrorResume(err -> {
-                                log.error("Error in node {}: {}", node.getId(), err.getMessage());
-                                updateStatus(node.getId(), "ERROR", err.getMessage());
-                                return Mono.empty();
-                            });
-                    })
-                    .subscribe(result -> {
-                        for (String targetId : targets) {
-                            Sinks.Many<Object> targetSink = sinks.get(targetId);
-                            if (targetSink != null) {
-                                targetSink.tryEmitNext(result);
-                            }
-                        }
-                    });
-                subscriptions.add(d);
+                startInputProducer(node.getId());
             }
         }
     }
 
-    private void startInputNode(String nodeId, NodeProcessor processor) {
-        updateStatus(nodeId, "RUNNING", null);
-        Disposable d = Flux.defer(() -> processor.process(null))
-            .subscribeOn(Schedulers.boundedElastic())
-            .flatMap(data -> {
-                incrementRec(nodeId);
-                List<String> targets = adjacency.getOrDefault(nodeId, List.of());
-                for (String targetId : targets) {
-                    Sinks.Many<Object> targetSink = sinks.get(targetId);
-                    if (targetSink != null) {
-                        targetSink.tryEmitNext(data);
-                    }
+    /**
+     * 统一订阅模式：订阅节点的 output()，推入下游节点的 inputSink
+     */
+    private void bindNode(Node node) {
+        NodeProcessor processor = processors.get(node.getId());
+        if (processor == null) return;
+
+        // 订阅所有节点的 output()，包括没有下游的 OUTPUT 节点
+        // 不订阅 → inputSink 无消费者 → 上游背压阻塞 → 整条链路卡死
+        Disposable d = processor.output()
+            .subscribe(result -> {
+                for (String targetId : processor.targets()) {
                     NodeProcessor targetProc = processors.get(targetId);
-                    if (targetProc != null) {
-                        targetProc.process(data)
-                            .doOnSuccess(r -> incrementSend(targetId))
-                            .subscribe();
+                    if (targetProc != null && targetProc.inputSink() != null) {
+                        targetProc.inputSink().tryEmitNext(result);
                     }
                 }
-                incrementSend(nodeId);
-                return Mono.empty();
-            })
-            .doOnError(err -> {
+            });
+        subscriptions.add(d);
+    }
+
+    /**
+     * INPUT 节点数据生产：订阅 output() 流，推入下游节点的 inputSink
+     */
+    private void startInputProducer(String nodeId) {
+        NodeProcessor processor = processors.get(nodeId);
+        processor.updateStatus("RUNNING", null);
+
+        Disposable d = processor.output()
+            .doOnNext(data -> processor.incrementRec())
+            .subscribe(data -> {
+                for (String targetId : processor.targets()) {
+                    NodeProcessor targetProc = processors.get(targetId);
+                    if (targetProc != null && targetProc.inputSink() != null) {
+                        targetProc.inputSink().tryEmitNext(data);
+                    }
+                }
+                processor.incrementSend();
+            },
+            err -> {
                 log.error("Input node {} error: {}", nodeId, err.getMessage());
-                updateStatus(nodeId, "ERROR", err.getMessage());
-            })
-            .subscribe();
+                processor.updateStatus("ERROR", err.getMessage());
+            });
         subscriptions.add(d);
     }
 
     public void emit(String nodeId, Object data) {
-        Sinks.Many<Object> sink = sinks.get(nodeId);
-        if (sink != null) {
-            sink.tryEmitNext(data);
+        NodeProcessor processor = processors.get(nodeId);
+        if (processor != null && processor.inputSink() != null) {
+            processor.inputSink().tryEmitNext(data);
         }
     }
 
     public Map<String, NodeStatus> getNodeStatuses() {
-        return new HashMap<>(statuses);
-    }
-
-    public NodeStatus getNodeStatus(String nodeId) {
-        return statuses.getOrDefault(nodeId, new NodeStatus());
-    }
-
-    private void updateStatus(String nodeId, String state, String message) {
-        NodeStatus status = statuses.computeIfAbsent(nodeId, k -> new NodeStatus());
-        status.setState(state);
-        if (message != null) status.setMessage(message);
-    }
-
-    private void incrementRec(String nodeId) {
-        NodeStatus status = statuses.computeIfAbsent(nodeId, k -> new NodeStatus());
-        status.setRecNumb(status.getRecNumb() + 1);
-    }
-
-    private void incrementSend(String nodeId) {
-        NodeStatus status = statuses.computeIfAbsent(nodeId, k -> new NodeStatus());
-        status.setSendNumb(status.getSendNumb() + 1);
+        Map<String, NodeStatus> result = new HashMap<>();
+        processors.forEach((id, proc) -> result.put(id, proc.status()));
+        return result;
     }
 
     private void cancelSubscriptions() {
@@ -187,8 +152,6 @@ public class FlowEngine {
         cancelSubscriptions();
         processors.values().forEach(NodeProcessor::destroy);
         processors.clear();
-        sinks.values().forEach(s -> s.tryEmitComplete());
-        sinks.clear();
         log.info("FlowEngine stopped for task {}", taskId);
     }
 

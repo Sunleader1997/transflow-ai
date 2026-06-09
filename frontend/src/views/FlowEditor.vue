@@ -6,7 +6,7 @@
     <header class="editor-header">
       <button class="btn" @click="$router.push('/tasks')">&#8592; 返回</button>
       <h2>{{ taskName }}</h2>
-      <span class="shortcut-hint">Ctrl+S 保存 | Backspace 删除节点 | 点击连线删除 | 双击节点配置</span>
+      <span class="shortcut-hint">Ctrl+S 保存 | Backspace 删除节点 | 双击节点配置</span>
       <button class="btn btn-primary" @click="saveFlow">保存流程</button>
     </header>
     <div class="editor-body">
@@ -41,7 +41,6 @@
           :connection-mode="'strict'"
           :default-edge-options="{ animated: true, style: { stroke: '#26A69A', strokeWidth: 2 } }"
           @nodes-change="onNodesChange"
-          @edge-click="onEdgeClick"
           @node-double-click="onNodeDoubleClick"
           @pane-click="onPaneClick"
           @connect="onConnect"
@@ -221,12 +220,6 @@ const onConnect = (connection) => {
 
 const deleteNode = (id) => {
   removeNodes(id)
-}
-
-const onEdgeClick = (edge) => {
-  if (confirm('删除此连线？')) {
-    edges.value = edges.value.filter(e => e.id !== edge.id)
-  }
 }
 
 const onNodesChange = (changes) => {

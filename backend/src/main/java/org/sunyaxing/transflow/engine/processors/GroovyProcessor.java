@@ -3,12 +3,13 @@ package org.sunyaxing.transflow.engine.processors;
 import com.alibaba.fastjson2.JSON;
 import groovy.lang.GroovyShell;
 import org.sunyaxing.transflow.model.NodeParam;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
 
-public class GroovyProcessor implements NodeProcessor {
+public class GroovyProcessor extends AbstractNodeProcessor {
 
     private String script;
 
@@ -26,6 +27,7 @@ public class GroovyProcessor implements NodeProcessor {
     @Override
     public Mono<Void> init(String nodeId, Map<String, Object> config) {
         this.script = (String) config.getOrDefault("script", "");
+        initInputSink();
         return Mono.empty();
     }
 
@@ -44,5 +46,7 @@ public class GroovyProcessor implements NodeProcessor {
     }
 
     @Override
-    public void destroy() {}
+    public void destroy() {
+        destroyInputSink();
+    }
 }

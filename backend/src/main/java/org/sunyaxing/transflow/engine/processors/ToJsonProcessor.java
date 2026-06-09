@@ -7,7 +7,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 
-public class ToJsonProcessor implements NodeProcessor {
+public class ToJsonProcessor extends AbstractNodeProcessor {
 
     @Override
     public String getType() { return "TO-JSON"; }
@@ -21,6 +21,7 @@ public class ToJsonProcessor implements NodeProcessor {
 
     @Override
     public Mono<Void> init(String nodeId, Map<String, Object> config) {
+        initInputSink();
         return Mono.empty();
     }
 
@@ -41,5 +42,7 @@ public class ToJsonProcessor implements NodeProcessor {
     }
 
     @Override
-    public void destroy() {}
+    public void destroy() {
+        destroyInputSink();
+    }
 }

@@ -1,5 +1,5 @@
 <template>
-  <div class="config-overlay" @click.self="$emit('close')">
+  <div class="config-overlay">
     <div class="config-panel">
       <div class="config-header">
         <h3>节点配置 — {{ node.data.label }}</h3>

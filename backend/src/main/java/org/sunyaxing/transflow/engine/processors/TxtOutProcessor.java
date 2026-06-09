@@ -7,7 +7,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 
-public class TxtOutProcessor implements NodeProcessor {
+public class TxtOutProcessor extends AbstractNodeProcessor {
 
     private volatile String latest;
 
@@ -24,6 +24,7 @@ public class TxtOutProcessor implements NodeProcessor {
     @Override
     public Mono<Void> init(String nodeId, Map<String, Object> config) {
         latest = null;
+        initInputSink();
         return Mono.empty();
     }
 
@@ -42,5 +43,6 @@ public class TxtOutProcessor implements NodeProcessor {
     @Override
     public void destroy() {
         latest = null;
+        destroyInputSink();
     }
 }

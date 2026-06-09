@@ -10,7 +10,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 
-public class HttpBackProcessor implements NodeProcessor {
+public class HttpBackProcessor extends AbstractNodeProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(HttpBackProcessor.class);
 
@@ -31,6 +31,7 @@ public class HttpBackProcessor implements NodeProcessor {
     @Override
     public Mono<Void> init(String nodeId, Map<String, Object> config) {
         this.script = (String) config.getOrDefault("script", "");
+        initInputSink();
         return Mono.empty();
     }
 
@@ -68,7 +69,9 @@ public class HttpBackProcessor implements NodeProcessor {
     }
 
     @Override
-    public void destroy() {}
+    public void destroy() {
+        destroyInputSink();
+    }
 
     @SuppressWarnings("unchecked")
     private String extractRequestId(Object data) {

@@ -2,6 +2,7 @@ package org.sunyaxing.transflow.engine.processors;
 
 import com.alibaba.fastjson2.JSON;
 import org.sunyaxing.transflow.model.NodeParam;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.netty.DisposableServer;
@@ -11,7 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class HttpServerProcessor implements NodeProcessor {
+public class HttpServerProcessor extends AbstractNodeProcessor {
 
     private DisposableServer server;
     private Sinks.Many<Object> dataSink;
@@ -69,6 +70,11 @@ public class HttpServerProcessor implements NodeProcessor {
     @Override
     public Mono<Object> process(Object data) {
         return Mono.from(dataSink.asFlux());
+    }
+
+    @Override
+    public Flux<Object> output() {
+        return dataSink.asFlux();
     }
 
     @Override

@@ -7,6 +7,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sunyaxing.transflow.model.NodeParam;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.kafka.receiver.KafkaReceiver;
@@ -16,7 +17,7 @@ import reactor.kafka.receiver.ReceiverRecord;
 import java.util.List;
 import java.util.Map;
 
-public class KafkaConsumerProcessor implements NodeProcessor {
+public class KafkaConsumerProcessor extends AbstractNodeProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaConsumerProcessor.class);
 
@@ -88,6 +89,27 @@ public class KafkaConsumerProcessor implements NodeProcessor {
                 return (Object) msg;
             })
             .doOnError(err -> log.error("[KafkaConsumer] Error: {}", err.getMessage())));
+    }
+
+    @Override
+    public Flux<Object> output() {
+        return receiver.receive()
+            .doOnNext(record -> record.receiverOffset().acknowledge())
+            .map(record -> {
+                Map<String, Object> msg = new java.util.HashMap<>();
+                msg.put("topic", record.topic());
+                msg.put("partition", record.partition());
+                msg.put("offset", record.offset());
+                msg.put("key", record.key());
+                try {
+                    msg.put("value", JSON.parse(record.value()));
+                } catch (Exception e) {
+                    msg.put("value", record.value());
+                }
+                msg.put("timestamp", record.timestamp());
+                return (Object) msg;
+            })
+            .doOnError(err -> log.error("[KafkaConsumer] Error: {}", err.getMessage()));
     }
 
     @Override

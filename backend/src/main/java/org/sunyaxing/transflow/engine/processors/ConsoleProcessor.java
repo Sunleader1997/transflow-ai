@@ -9,7 +9,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 
-public class ConsoleProcessor implements NodeProcessor {
+public class ConsoleProcessor extends AbstractNodeProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(ConsoleProcessor.class);
     private String prefix;
@@ -27,6 +27,7 @@ public class ConsoleProcessor implements NodeProcessor {
     @Override
     public Mono<Void> init(String nodeId, Map<String, Object> config) {
         this.prefix = (String) config.getOrDefault("prefix", "[TransFlow]");
+        initInputSink();
         return Mono.empty();
     }
 
@@ -39,5 +40,7 @@ public class ConsoleProcessor implements NodeProcessor {
     }
 
     @Override
-    public void destroy() {}
+    public void destroy() {
+        destroyInputSink();
+    }
 }

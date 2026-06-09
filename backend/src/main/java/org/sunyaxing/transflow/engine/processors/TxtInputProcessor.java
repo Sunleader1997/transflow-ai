@@ -8,7 +8,7 @@ import reactor.core.publisher.Sinks;
 import java.util.List;
 import java.util.Map;
 
-public class TxtInputProcessor implements NodeProcessor {
+public class TxtInputProcessor extends AbstractNodeProcessor {
 
     private Sinks.Many<Object> dataSink;
 
@@ -40,11 +40,15 @@ public class TxtInputProcessor implements NodeProcessor {
 
     @Override
     public Mono<Object> process(Object data) {
-        // External emit data passes through; internal config data comes from dataSink
         if (data != null) {
             return Mono.just(data);
         }
         return Mono.from(dataSink.asFlux());
+    }
+
+    @Override
+    public Flux<Object> output() {
+        return dataSink.asFlux();
     }
 
     @Override

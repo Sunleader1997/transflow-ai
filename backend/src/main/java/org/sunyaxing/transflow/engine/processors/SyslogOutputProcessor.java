@@ -15,7 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
-public class SyslogOutputProcessor implements NodeProcessor {
+public class SyslogOutputProcessor extends AbstractNodeProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(SyslogOutputProcessor.class);
     private static final DateTimeFormatter SYSLOG_TIME_FMT = DateTimeFormatter.ofPattern("MMM dd HH:mm:ss");
@@ -46,6 +46,7 @@ public class SyslogOutputProcessor implements NodeProcessor {
             try {
                 this.address = InetAddress.getByName(this.host);
                 this.socket = new DatagramSocket();
+                initInputSink();
                 log.info("[SyslogOutput] Initialized, target={}:{}", this.host, this.port);
             } catch (Exception e) {
                 log.error("[SyslogOutput] Failed to init UDP socket for {}:{}: {}", this.host, this.port, e.getMessage(), e);
@@ -72,6 +73,7 @@ public class SyslogOutputProcessor implements NodeProcessor {
 
     @Override
     public void destroy() {
+        destroyInputSink();
         if (socket != null && !socket.isClosed()) {
             socket.close();
             log.info("[SyslogOutput] Socket closed for {}:{}", host, port);

@@ -7,7 +7,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 
-public class IfElseProcessor implements NodeProcessor {
+public class IfElseProcessor extends AbstractNodeProcessor {
 
     private String condition;
 
@@ -25,6 +25,7 @@ public class IfElseProcessor implements NodeProcessor {
     @Override
     public Mono<Void> init(String nodeId, Map<String, Object> config) {
         this.condition = (String) config.getOrDefault("condition", "");
+        initInputSink();
         return Mono.empty();
     }
 
@@ -45,5 +46,7 @@ public class IfElseProcessor implements NodeProcessor {
     }
 
     @Override
-    public void destroy() {}
+    public void destroy() {
+        destroyInputSink();
+    }
 }
