@@ -83,9 +83,24 @@ const sendData = () => {
   inputText.value = ''
 }
 
-const copyOutput = () => {
-  if (props.data.outputText) {
-    navigator.clipboard.writeText(props.data.outputText)
+const copyOutput = async () => {
+  const text = props.data.outputText
+  if (!text) return
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+  } catch (e) {
+    console.error('复制失败', e)
   }
 }
 </script>

@@ -38,9 +38,16 @@
           <p class="param-hint" v-if="param.hint && param.type !== 'hint'">{{ param.hint }}</p>
         </div>
       </div>
+      <div v-if="compileError" class="compile-error">
+        <span class="error-icon">&#9888;</span>
+        <span class="error-text">{{ compileError }}</span>
+      </div>
       <div class="config-footer">
         <button class="btn" @click="$emit('close')">取消</button>
-        <button class="btn btn-primary" @click="save">保存</button>
+        <button class="btn btn-primary" @click="save" :disabled="compiling">
+          <span v-if="compiling">编译中...</span>
+          <span v-else>保存</span>
+        </button>
       </div>
     </div>
   </div>
@@ -48,7 +55,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { flowApi } from '../api/index.js'
+import { flowApi, groovyApi } from '../api/index.js'
 import GroovyCodeEditor from './GroovyCodeEditor.vue'
 
 const props = defineProps(['node', 'configParams'])
@@ -56,10 +63,19 @@ const emit = defineEmits(['close', 'save'])
 
 const localConfig = ref({ ...props.node.data.config })
 const params = ref([])
+const compiling = ref(false)
+const compileError = ref('')
 
 watch(() => props.node, (n) => {
-  if (n) localConfig.value = { ...n.data.config }
+  if (n) {
+    localConfig.value = { ...n.data.config }
+    compileError.value = ''
+  }
 }, { immediate: true })
+
+watch(localConfig, () => {
+  compileError.value = ''
+}, { deep: true })
 
 const fillDefaults = (config, paramList) => {
   const filled = { ...config }
@@ -149,7 +165,37 @@ const getDefaultParams = (type) => {
   return defaults[type] || []
 }
 
-const save = () => {
+const save = async () => {
+  compileError.value = ''
+
+  const scriptFields = []
+  for (const p of params.value) {
+    if (p.type === 'code' && p.field) {
+      const script = localConfig.value[p.field]
+      if (script && script.trim()) {
+        scriptFields.push({ field: p.field, script })
+      }
+    }
+  }
+
+  if (scriptFields.length > 0) {
+    compiling.value = true
+    try {
+      for (const { script } of scriptFields) {
+        const { data } = await groovyApi.compile(script)
+        if (!data.success) {
+          compileError.value = data.message || 'Groovy 编译失败'
+          return
+        }
+      }
+    } catch (e) {
+      compileError.value = e.response?.data?.message || '编译请求失败，请检查后端服务'
+      return
+    } finally {
+      compiling.value = false
+    }
+  }
+
   emit('save', props.node.id, localConfig.value)
 }
 
@@ -174,4 +220,8 @@ loadParams()
 .hint-text { font-size: 13px; color: var(--text-secondary); font-style: italic; padding: 8px; background: #f9fafb; border-radius: 6px; }
 .btn { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; background: #fff; }
 .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.compile-error { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #fef2f2; border-top: 1px solid #fecaca; color: #b91c1c; font-size: 12px; }
+.error-icon { font-size: 14px; }
+.error-text { white-space: pre-wrap; word-break: break-all; }
 </style>

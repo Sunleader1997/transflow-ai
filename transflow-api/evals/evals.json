@@ -1,0 +1,40 @@
+{
+  "skill_name": "transflow-api",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我创建一个 TransFlow 任务，名字叫 '日志处理'，描述是 '过滤错误日志并输出到控制台'。流程是：TXT-INPUT 输入一些测试日志，经过 IF-ELSE 过滤包含 'ERROR' 的行，最后输出到 CONSOLE。请创建任务、配置流程，并验证节点配置正确。",
+      "expected_output": "成功创建任务，配置包含3个节点（TXT-INPUT -> IF-ELSE -> CONSOLE）的flow，IF-ELSE条件为包含'ERROR'的表达式",
+      "files": [],
+      "assertions": [
+        {"name": "task_created", "description": "POST /api/tasks returned 200 with valid task object"},
+        {"name": "flow_saved", "description": "PUT /api/flow/{taskId} returned 200"},
+        {"name": "three_nodes", "description": "Flow contains exactly 3 nodes: TXT-INPUT, IF-ELSE, CONSOLE"},
+        {"name": "error_filter_condition", "description": "IF-ELSE node config contains a condition referencing ERROR"},
+        {"name": "edges_correct", "description": "Flow has edges connecting TXT-INPUT -> IF-ELSE -> CONSOLE"}
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "帮我查看所有 TransFlow 任务，并获取第一个任务的节点状态和输出。",
+      "expected_output": "列出所有任务，然后获取第一个任务的节点状态map和各个OUTPUT节点的输出数据",
+      "files": [],
+      "assertions": [
+        {"name": "tasks_listed", "description": "GET /api/tasks returned a non-empty list"},
+        {"name": "node_statuses_fetched", "description": "GET /api/flow-data/node-statuses/{taskId} returned a status map"},
+        {"name": "output_fetched", "description": "GET /api/flow-data/output/{nodeId} was called for at least one output node"}
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "我有一个 TransFlow 任务叫 'a'（ID: bf3526f1），帮我向它的 TXT-INPUT 节点发送一条测试数据 '{\"test\": \"hello\"}'，然后检查 TXT-OUT 节点的输出结果。",
+      "expected_output": "成功向TXT-INPUT节点注入数据，并从TXT-OUT节点获取到处理后的输出",
+      "files": [],
+      "assertions": [
+        {"name": "data_emitted", "description": "POST /api/flow-data/emit returned 200 with data sent to the TXT-INPUT node"},
+        {"name": "output_checked", "description": "GET /api/flow-data/output/{nodeId} returned results from the TXT-OUT node"},
+        {"name": "correct_task_id", "description": "The task ID bf3526f1 was used for the emit call"}
+      ]
+    }
+  ]
+}

@@ -34,6 +34,13 @@ export const flowApi = {
   }
 }
 
+// Groovy compile check
+export const groovyApi = {
+  compile(script) {
+    return api.post('/groovy/compile', { script })
+  }
+}
+
 // Flow data & status
 export const flowDataApi = {
   emit(taskId, nodeId, data) {

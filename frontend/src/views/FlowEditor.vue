@@ -33,7 +33,7 @@
           ref="vueFlowRef"
           v-model:nodes="nodes"
           v-model:edges="edges"
-          :default-viewport="{ zoom: 0.7, x: 0, y: 0 }"
+          :default-viewport="{ zoom: 1, x: 0, y: 0 }"
           :min-zoom="0.2"
           :max-zoom="4"
           :snap-to-grid="true"
