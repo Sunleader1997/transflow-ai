@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "material-icons": "^1.13.14",
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/language": "^6.12.3",
     "@codemirror/state": "^6.6.0",

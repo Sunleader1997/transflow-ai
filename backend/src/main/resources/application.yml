@@ -1,0 +1,9 @@
+server:
+  port: 18900
+
+spring:
+  main:
+    web-application-type: reactive
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false

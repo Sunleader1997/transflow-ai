@@ -97,20 +97,11 @@ mkdir -p "$PKG_DIR"/{config,logs,db}
 # 复制 JAR
 cp "$JAR_PATH" "$PKG_DIR/$JAR_NAME"
 
-# 生成默认配置
-cat > "$PKG_DIR/config/application.properties" <<'EOF'
-server.port=8080
-spring.main.web-application-type=reactive
-spring.jackson.serialization.write-dates-as-timestamps=false
-
-# 日志
-logging.file.name=logs/transflow.log
-logging.level.root=INFO
-logging.level.org.sunyaxing.transflow=INFO
-
-# 数据持久化目录
-transflow.db.dir=db
-EOF
+# 复制配置文件
+if [ -f "$SCRIPT_DIR/backend/src/main/resources/application.yml" ]; then
+    cp "$SCRIPT_DIR/backend/src/main/resources/application.yml" "$PKG_DIR/config/"
+    echo "  已复制配置文件: application.yml"
+fi
 
 # 生成启动脚本
 cat > "$PKG_DIR/start.sh" <<'STARTEOF'
@@ -148,7 +139,6 @@ case "${1:-start}" in
     sleep 2
     if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
       echo "TRANSFLOW 启动成功 (PID: $(cat "$PID_FILE"))"
-      echo "访问: http://localhost:8080"
     else
       echo "启动失败，请查看日志: $SCRIPT_DIR/logs/startup.log"
       exit 1
