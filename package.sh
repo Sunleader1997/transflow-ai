@@ -173,8 +173,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=transflow
-Group=transflow
+User=root
+Group=root
 WorkingDirectory=/opt/transflow-ai
 ExecStart=/opt/transflow-ai/start.sh start
 ExecStop=/opt/transflow-ai/start.sh stop
