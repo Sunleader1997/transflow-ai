@@ -25,6 +25,7 @@ public class TxtInputProcessor extends AbstractNodeProcessor {
     @Override
     public Mono<Void> init(String nodeId, Map<String, Object> config) {
         String text = (String) config.getOrDefault("text", "");
+        initInputSink();
         dataSink = Sinks.many().multicast().onBackpressureBuffer(256, false);
 
         if (text != null && !text.isBlank()) {
@@ -48,7 +49,7 @@ public class TxtInputProcessor extends AbstractNodeProcessor {
 
     @Override
     public Flux<Object> output() {
-        return dataSink.asFlux();
+        return Flux.merge(dataSink.asFlux(), inputSink().asFlux());
     }
 
     @Override
@@ -56,5 +57,6 @@ public class TxtInputProcessor extends AbstractNodeProcessor {
         if (dataSink != null) {
             dataSink.tryEmitComplete();
         }
+        destroyInputSink();
     }
 }

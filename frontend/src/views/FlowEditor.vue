@@ -184,7 +184,7 @@ const getDefaultConfig = (type) => {
   const defaults = {
     'TXT-INPUT': { text: '' },
     'KAFKA-CONSUMER': { bootstrapServers: 'localhost:9092', topic: '', groupId: 'transflow' },
-    'HTTP-SERVER': { port: '8888', path: '/api/data' },
+    'HTTP-SERVER': { port: '8888', defaultResponse: '{"code":200,"message":"ok"}', timeout: '30' },
     'SYSLOG-INPUT': { port: '514' },
     'FILE': { path: '', mode: 'TAIL' },
     'DIR': { path: '' },

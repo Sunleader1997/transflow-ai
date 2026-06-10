@@ -61,6 +61,16 @@ watch(() => props.node, (n) => {
   if (n) localConfig.value = { ...n.data.config }
 }, { immediate: true })
 
+const fillDefaults = (config, paramList) => {
+  const filled = { ...config }
+  for (const p of paramList) {
+    if (p.field && (filled[p.field] === undefined || filled[p.field] === '')) {
+      filled[p.field] = p.defaultValue ?? ''
+    }
+  }
+  return filled
+}
+
 // Fetch config params from backend for this node type
 const loadParams = async () => {
   try {
@@ -71,6 +81,7 @@ const loadParams = async () => {
       const backendNode = data.flow.nodes.find(n => n.id === props.node.id)
       if (backendNode?.configParams) {
         params.value = backendNode.configParams
+        localConfig.value = fillDefaults(localConfig.value, backendNode.configParams)
         return
       }
     }
@@ -78,7 +89,9 @@ const loadParams = async () => {
     // fallback to default params
   }
   // Default params based on node type
-  params.value = getDefaultParams(props.node.data.type)
+  const defaults = getDefaultParams(props.node.data.type)
+  params.value = defaults
+  localConfig.value = fillDefaults(localConfig.value, defaults)
 }
 
 const getDefaultParams = (type) => {
@@ -93,7 +106,8 @@ const getDefaultParams = (type) => {
     ],
     'HTTP-SERVER': [
       { field: 'port', label: '监听端口', type: 'number', defaultValue: '8888', placeholder: '8888' },
-      { field: 'path', label: '路径', type: 'text', defaultValue: '/api/data', placeholder: '/api/data' }
+      { field: 'defaultResponse', label: '默认返回', type: 'textarea', defaultValue: '{"code":200,"message":"ok"}', placeholder: '{"code":200,"message":"ok"}' },
+      { field: 'timeout', label: '超时(秒)', type: 'number', defaultValue: '30', placeholder: '30' }
     ],
     'SYSLOG-INPUT': [
       { field: 'port', label: '监听端口', type: 'number', defaultValue: '514', placeholder: '514' }
