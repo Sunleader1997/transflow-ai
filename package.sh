@@ -2,7 +2,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="transflow"
+APP_NAME="transflow-ai"
 JAR_NAME="transflow-1.0.0.jar"
 VERSION="1.0.0"
 OUTPUT_NAME="${APP_NAME}-${VERSION}.zip"
@@ -90,7 +90,7 @@ if [ ! -f "$JAR_PATH" ]; then
 fi
 
 # 创建临时打包目录
-PKG_DIR="$SCRIPT_DIR/target/package-${APP_NAME}"
+PKG_DIR="$SCRIPT_DIR/target/${APP_NAME}"
 rm -rf "$PKG_DIR"
 mkdir -p "$PKG_DIR"/{config,logs,db}
 
@@ -103,14 +103,13 @@ if [ -f "$SCRIPT_DIR/backend/src/main/resources/application.yml" ]; then
     echo "  已复制配置文件: application.yml"
 fi
 
-# 生成启动脚本
+# 生成启动脚本（前台运行，适配 systemd）
 cat > "$PKG_DIR/start.sh" <<'STARTEOF'
 #!/bin/bash
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 JAR_NAME="transflow-1.0.0.jar"
-PID_FILE="$SCRIPT_DIR/transflow.pid"
 
 # 查找 Java
 if [ -n "$JAVA_HOME" ]; then
@@ -127,49 +126,35 @@ JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC"
 
 case "${1:-start}" in
   start)
-    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-      echo "TRANSFLOW 已在运行 (PID: $(cat "$PID_FILE"))"
-      exit 0
-    fi
     echo "启动 TRANSFLOW..."
-    nohup "$JAVA_CMD" $JAVA_OPTS -jar "$SCRIPT_DIR/$JAR_NAME" \
-      --spring.config.location="$SCRIPT_DIR/config/" \
-      > "$SCRIPT_DIR/logs/startup.log" 2>&1 &
-    echo $! > "$PID_FILE"
-    sleep 2
-    if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-      echo "TRANSFLOW 启动成功 (PID: $(cat "$PID_FILE"))"
-    else
-      echo "启动失败，请查看日志: $SCRIPT_DIR/logs/startup.log"
-      exit 1
-    fi
+    exec "$JAVA_CMD" $JAVA_OPTS -jar "$SCRIPT_DIR/$JAR_NAME" \
+      --spring.config.location="$SCRIPT_DIR/config/"
     ;;
   stop)
-    if [ -f "$PID_FILE" ]; then
-      PID=$(cat "$PID_FILE")
-      if kill -0 "$PID" 2>/dev/null; then
-        echo "停止 TRANSFLOW (PID: $PID)..."
-        kill "$PID"
-        rm -f "$PID_FILE"
-        echo "已停止"
-      else
-        echo "进程不存在，清理 PID 文件"
-        rm -f "$PID_FILE"
-      fi
+    if [ -f /etc/systemd/system/transflow-ai.service ]; then
+      sudo systemctl stop transflow-ai
     else
-      echo "TRANSFLOW 未在运行"
+      pkill -f "$JAR_NAME" || true
     fi
     ;;
   restart)
-    "$0" stop
-    sleep 1
-    "$0" start
+    if [ -f /etc/systemd/system/transflow-ai.service ]; then
+      sudo systemctl restart transflow-ai
+    else
+      "$0" stop
+      sleep 1
+      "$0" start
+    fi
     ;;
   status)
-    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-      echo "TRANSFLOW 运行中 (PID: $(cat "$PID_FILE"))"
+    if [ -f /etc/systemd/system/transflow-ai.service ]; then
+      systemctl status transflow-ai
     else
-      echo "TRANSFLOW 未运行"
+      if pgrep -f "$JAR_NAME" > /dev/null; then
+        echo "TRANSFLOW 运行中 (PID: $(pgrep -f "$JAR_NAME"))"
+      else
+        echo "TRANSFLOW 未运行"
+      fi
     fi
     ;;
   *)
@@ -180,18 +165,122 @@ esac
 STARTEOF
 chmod +x "$PKG_DIR/start.sh"
 
+# 生成 systemd service 文件
+cat > "$PKG_DIR/transflow-ai.service" <<'SERVICEEOF'
+[Unit]
+Description=Transflow AI Service
+After=network.target
+
+[Service]
+Type=simple
+User=transflow
+Group=transflow
+WorkingDirectory=/opt/transflow-ai
+ExecStart=/opt/transflow-ai/start.sh start
+ExecStop=/opt/transflow-ai/start.sh stop
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
+SERVICEEOF
+
+# 生成安装脚本
+cat > "$PKG_DIR/install.sh" <<'INSTALLEOF'
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+INSTALL_DIR="/opt/transflow-ai"
+SERVICE_NAME="transflow-ai"
+
+# 检查 root 权限
+if [ "$(id -u)" -ne 0 ]; then
+    echo "错误: 安装需要 root 权限，请使用 sudo 运行"
+    exit 1
+fi
+
+echo "========================================="
+echo "  TRANSFLOW 灵流 - 安装脚本"
+echo "========================================="
+echo ""
+
+# 创建系统用户
+if ! id transflow &>/dev/null; then
+    echo "[1/5] 创建系统用户 transflow..."
+    useradd -r -s /bin/false -d "$INSTALL_DIR" transflow
+else
+    echo "[1/5] 用户 transflow 已存在，跳过"
+fi
+
+# 创建安装目录
+echo "[2/5] 安装文件到 $INSTALL_DIR..."
+mkdir -p "$INSTALL_DIR"
+cp -a "$SCRIPT_DIR"/. "$INSTALL_DIR"/
+
+# 设置目录权限
+echo "[3/5] 设置目录权限..."
+chown -R transflow:transflow "$INSTALL_DIR"
+chmod +x "$INSTALL_DIR/start.sh"
+
+# 安装 systemd service
+echo "[4/5] 安装 systemd 服务..."
+cp "$INSTALL_DIR/transflow-ai.service" /etc/systemd/system/
+systemctl daemon-reload
+
+# 启用并启动服务
+echo "[5/5] 启用并启动服务..."
+systemctl enable "$SERVICE_NAME"
+systemctl start "$SERVICE_NAME"
+
+echo ""
+echo "========================================="
+echo "  安装完成!"
+echo "========================================="
+echo ""
+echo "  服务管理命令:"
+echo "    sudo systemctl start transflow-ai    启动"
+echo "    sudo systemctl stop transflow-ai     停止"
+echo "    sudo systemctl restart transflow-ai  重启"
+echo "    sudo systemctl status transflow-ai   查看状态"
+echo "    sudo journalctl -u transflow-ai -f   查看日志"
+echo ""
+echo "  访问地址: http://localhost:8080"
+echo ""
+INSTALLEOF
+chmod +x "$PKG_DIR/install.sh"
+
 # 生成卸载脚本
 cat > "$PKG_DIR/uninstall.sh" <<'UNINSTALLEOF'
 #!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [ -f "$SCRIPT_DIR/transflow.pid" ] && kill -0 "$(cat "$SCRIPT_DIR/transflow.pid")" 2>/dev/null; then
-    echo "请先停止服务: $SCRIPT_DIR/start.sh stop"
+set -e
+
+INSTALL_DIR="/opt/transflow-ai"
+SERVICE_NAME="transflow-ai"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "错误: 卸载需要 root 权限，请使用 sudo 运行"
     exit 1
 fi
+
 echo "卸载 TRANSFLOW..."
-cd "$SCRIPT_DIR/.."
-rm -rf "$SCRIPT_DIR"
-echo "已卸载"
+
+# 停止并禁用服务
+systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+rm -f /etc/systemd/system/"$SERVICE_NAME".service
+systemctl daemon-reload
+
+# 删除安装目录
+rm -rf "$INSTALL_DIR"
+
+# 删除系统用户
+if id transflow &>/dev/null; then
+    userdel transflow 2>/dev/null || true
+fi
+
+echo "已卸载 TRANSFLOW"
 UNINSTALLEOF
 chmod +x "$PKG_DIR/uninstall.sh"
 
@@ -202,27 +291,38 @@ TRANSFLOW 灵流 v1.0.0
 
 目录结构
 --------
-  transflow-1.0.0.jar    主程序 JAR
-  config/                配置文件目录
-    application.properties
-  logs/                  日志目录
-  db/                    数据持久化目录
-  start.sh               启动/停止/重启脚本
-  uninstall.sh           卸载脚本
+  transflow-1.0.0.jar      主程序 JAR
+  config/                  配置文件目录
+    application.yml
+  logs/                    日志目录
+  db/                      数据持久化目录
+  start.sh                 启动脚本（前台运行，适配 systemd）
+  install.sh               安装脚本（安装到 /opt/transflow-ai）
+  uninstall.sh             卸载脚本
+  transflow-ai.service     systemd 服务文件
 
 快速开始
 --------
   1. 解压 zip 包到任意目录
   2. 进入解压后的目录
-  3. 执行 ./start.sh start 启动服务
+  3. 执行 sudo ./install.sh 安装服务
   4. 浏览器访问 http://localhost:8080
 
-常用命令
---------
-  ./start.sh start    启动服务
-  ./start.sh stop     停止服务
-  ./start.sh restart  重启服务
-  ./start.sh status   查看运行状态
+手动运行（不使用 systemd）
+------------------------
+  ./start.sh start    前台启动（Ctrl+C 停止）
+
+systemd 服务管理
+----------------
+  sudo systemctl start transflow-ai     启动
+  sudo systemctl stop transflow-ai      停止
+  sudo systemctl restart transflow-ai   重启
+  sudo systemctl status transflow-ai    查看状态
+  sudo journalctl -u transflow-ai -f    查看日志
+
+卸载
+----
+  sudo ./uninstall.sh
 
 环境要求
 --------
@@ -233,7 +333,7 @@ READMEEOF
 # 打包成 zip
 cd "$SCRIPT_DIR/target"
 rm -f "$OUTPUT_NAME"
-zip -r "$OUTPUT_NAME" "package-${APP_NAME}"
+zip -r "$OUTPUT_NAME" "${APP_NAME}"
 
 JAR_SIZE=$(du -h "$JAR_PATH" | cut -f1)
 ZIP_SIZE=$(du -h "$SCRIPT_DIR/target/$OUTPUT_NAME" | cut -f1)
@@ -247,8 +347,7 @@ echo "  输出文件: target/$OUTPUT_NAME"
 echo "  ZIP 大小: $ZIP_SIZE"
 echo "  JAR 大小: $JAR_SIZE"
 echo ""
-echo "  解压后即可运行:"
-echo "    unzip target/$OUTPUT_NAME"
-echo "    cd package-transflow"
-echo "    ./start.sh start"
+echo "  部署方式:"
+echo "    1. 解压: unzip target/$OUTPUT_NAME"
+echo "    2. 安装: cd $APP_NAME && sudo ./install.sh"
 echo ""
