@@ -79,6 +79,7 @@ public class FileProcessor extends AbstractNodeProcessor {
         if (dataSink != null) {
             dataSink.tryEmitComplete();
         }
+        super.destroy();
         log.info("[FileProcessor] Stopped, path={}", filePath);
     }
 

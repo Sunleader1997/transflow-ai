@@ -66,7 +66,7 @@ public class FlowEngine {
         running = true;
         log.info("FlowEngine started for task {}", taskId);
 
-        // 第一步：为所有节点绑定输出流订阅（output → 推入下游 inputSink）
+        // 第一步：为所有节点绑定输出流订阅（output → 推入下游 inputSink）并标记状态
         for (Node node : nodeMap.values()) {
             bindNode(node);
         }
@@ -96,6 +96,10 @@ public class FlowEngine {
                         targetProc.inputSink().tryEmitNext(result);
                     }
                 }
+            },
+            err -> {
+                log.error("Node {} error: {}", node.getId(), err.getMessage());
+                processor.updateStatus("ERROR", err.getMessage());
             });
         subscriptions.add(d);
     }
@@ -105,7 +109,6 @@ public class FlowEngine {
      */
     private void startInputProducer(String nodeId) {
         NodeProcessor processor = processors.get(nodeId);
-        processor.updateStatus("RUNNING", null);
 
         Disposable d = processor.output()
             .doOnNext(data -> processor.incrementRec())

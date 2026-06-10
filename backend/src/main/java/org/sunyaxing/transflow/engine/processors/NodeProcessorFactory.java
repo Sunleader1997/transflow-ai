@@ -36,6 +36,7 @@ public class NodeProcessorFactory {
         NodeProcessor processor = supplier.get();
         Map<String, Object> config = node.getConfig() != null ? node.getConfig() : Map.of();
         return processor.init(node.getId(), config)
+            .doOnSuccess(v -> processor.updateStatus("RUNNING", null))
             .thenReturn(processor)
             .subscribeOn(Schedulers.boundedElastic());
     }

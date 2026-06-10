@@ -108,6 +108,7 @@ public class DirProcessor extends AbstractNodeProcessor {
         if (dataSink != null) {
             dataSink.tryEmitComplete();
         }
+        super.destroy();
         log.info("[DirProcessor] Stopped, dir={}", dirPath);
     }
 }

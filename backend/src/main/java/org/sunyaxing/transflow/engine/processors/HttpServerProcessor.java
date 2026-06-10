@@ -115,6 +115,7 @@ public class HttpServerProcessor extends AbstractNodeProcessor {
         if (dataSink != null) {
             dataSink.tryEmitComplete();
         }
+        super.destroy();
     }
 
     private Map<String, Object> buildEnvelope(String path, String method, String body, String uri, String requestId) {

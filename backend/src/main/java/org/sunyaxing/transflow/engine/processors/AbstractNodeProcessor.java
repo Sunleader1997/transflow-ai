@@ -25,6 +25,12 @@ public abstract class AbstractNodeProcessor implements NodeProcessor {
     }
 
     @Override
+    public void destroy() {
+        updateStatus("STOPPED", null);
+        destroyInputSink();
+    }
+
+    @Override
     public Sinks.Many<Object> inputSink() { return inputSink; }
 
     @Override

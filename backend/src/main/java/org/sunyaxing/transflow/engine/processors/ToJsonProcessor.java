@@ -43,6 +43,6 @@ public class ToJsonProcessor extends AbstractNodeProcessor {
 
     @Override
     public void destroy() {
-        destroyInputSink();
+        super.destroy();
     }
 }

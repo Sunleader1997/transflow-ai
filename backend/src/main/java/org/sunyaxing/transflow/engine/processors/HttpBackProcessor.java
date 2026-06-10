@@ -70,7 +70,7 @@ public class HttpBackProcessor extends AbstractNodeProcessor {
 
     @Override
     public void destroy() {
-        destroyInputSink();
+        super.destroy();
     }
 
     @SuppressWarnings("unchecked")

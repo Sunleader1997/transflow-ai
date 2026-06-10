@@ -47,6 +47,6 @@ public class GroovyProcessor extends AbstractNodeProcessor {
 
     @Override
     public void destroy() {
-        destroyInputSink();
+        super.destroy();
     }
 }

@@ -57,6 +57,6 @@ public class TxtInputProcessor extends AbstractNodeProcessor {
         if (dataSink != null) {
             dataSink.tryEmitComplete();
         }
-        destroyInputSink();
+        super.destroy();
     }
 }

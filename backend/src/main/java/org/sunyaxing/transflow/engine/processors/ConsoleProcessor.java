@@ -41,6 +41,6 @@ public class ConsoleProcessor extends AbstractNodeProcessor {
 
     @Override
     public void destroy() {
-        destroyInputSink();
+        super.destroy();
     }
 }

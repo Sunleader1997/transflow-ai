@@ -73,7 +73,7 @@ public class SyslogOutputProcessor extends AbstractNodeProcessor {
 
     @Override
     public void destroy() {
-        destroyInputSink();
+        super.destroy();
         if (socket != null && !socket.isClosed()) {
             socket.close();
             log.info("[SyslogOutput] Socket closed for {}:{}", host, port);

@@ -71,7 +71,7 @@ public class KafkaProducerProcessor extends AbstractNodeProcessor {
 
     @Override
     public void destroy() {
-        destroyInputSink();
+        super.destroy();
         if (sender != null) {
             sender.close();
         }

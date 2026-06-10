@@ -43,6 +43,6 @@ public class TxtOutProcessor extends AbstractNodeProcessor {
     @Override
     public void destroy() {
         latest = null;
-        destroyInputSink();
+        super.destroy();
     }
 }

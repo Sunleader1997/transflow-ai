@@ -117,6 +117,7 @@ public class KafkaConsumerProcessor extends AbstractNodeProcessor {
         if (dataSink != null) {
             dataSink.tryEmitComplete();
         }
+        super.destroy();
         log.info("[KafkaConsumer] Stopped");
     }
 }

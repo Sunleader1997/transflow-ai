@@ -47,6 +47,6 @@ public class IfElseProcessor extends AbstractNodeProcessor {
 
     @Override
     public void destroy() {
-        destroyInputSink();
+        super.destroy();
     }
 }

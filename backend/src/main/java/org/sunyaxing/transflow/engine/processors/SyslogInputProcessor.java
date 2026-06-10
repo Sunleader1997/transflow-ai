@@ -103,6 +103,7 @@ public class SyslogInputProcessor extends AbstractNodeProcessor {
         if (dataSink != null) {
             dataSink.tryEmitComplete();
         }
+        super.destroy();
         log.info("[SyslogInput] Stopped, port {}", port);
     }
 }
