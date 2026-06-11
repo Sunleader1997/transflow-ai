@@ -15,6 +15,12 @@ const routes = [
     name: 'FlowEditor',
     component: () => import('../views/FlowEditor.vue'),
     props: true
+  },
+  {
+    path: '/workflow/:templateId/history',
+    name: 'ExecutionHistory',
+    component: () => import('../views/ExecutionHistory.vue'),
+    props: true
   }
 ]
 
