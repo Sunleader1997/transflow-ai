@@ -21,6 +21,12 @@ const routes = [
     name: 'ExecutionHistory',
     component: () => import('../views/ExecutionHistory.vue'),
     props: true
+  },
+  {
+    path: '/execution/:executionId',
+    name: 'ExecutionDetail',
+    component: () => import('../views/ExecutionDetail.vue'),
+    props: true
   }
 ]
 
