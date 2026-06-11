@@ -27,9 +27,9 @@ If the user provides an address, use it as the API base URL. If the user says it
 # Check if service is running
 ./transflow-workflow/scripts/check_service.sh http://localhost:18900
 
-# Create a workflow template
+# Create a workflow template (with proper node spacing)
 ./transflow-workflow/scripts/create_template.sh http://localhost:18900 "My Workflow" "Description" \
-  '[{"id":"n1","title":"Start","description":"Begin"},{"id":"n2","title":"Process","description":"Do work"}]' \
+  '[{"id":"n1","title":"Start","description":"Begin","position":{"x":50,"y":100}},{"id":"n2","title":"Process","description":"Do work","position":{"x":400,"y":100}}]' \
   '[{"id":"e1","source":"n1","target":"n2"}]'
 
 # List all templates
@@ -120,3 +120,32 @@ When a node fails, update its status with a detail message:
 - Node IDs must match those defined in the template
 - Heartbeats should be sent periodically for long-running executions
 - Use `get_execution.sh` to poll execution progress
+
+## Node Layout
+
+When creating templates, always include `position` for each node to ensure proper spacing in the VueFlow editor.
+
+**Recommended spacing:**
+- Horizontal: 350px between nodes in the same row
+- Vertical: 200px between rows
+- Start position: `{"x": 50, "y": 100}`
+
+**Example with proper layout:**
+```json
+[
+  {"id":"n1","title":"Start","description":"Begin workflow","position":{"x":50,"y":100}},
+  {"id":"n2","title":"Process Data","description":"Transform input","position":{"x":400,"y":100}},
+  {"id":"n3","title":"Validate","description":"Check results","position":{"x":750,"y":100}},
+  {"id":"n4","title":"Deploy","description":"Publish output","position":{"x":1100,"y":100}}
+]
+```
+
+**For branching workflows (vertical layout):**
+```json
+[
+  {"id":"n1","title":"Input","description":"Receive data","position":{"x":50,"y":100}},
+  {"id":"n2","title":"Process A","description":"Path A","position":{"x":400,"y":0}},
+  {"id":"n3","title":"Process B","description":"Path B","position":{"x":400,"y":200}},
+  {"id":"n4","title":"Merge","description":"Combine results","position":{"x":750,"y":100}}
+]
+```
