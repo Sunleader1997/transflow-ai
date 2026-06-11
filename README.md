@@ -81,8 +81,6 @@ HTTP-SERVER → [GROOVY / IF-ELSE / ...] → HTTP-BACK
 
 ```
 transflow-ai/
-├── start.sh                    # 开发环境一键启动脚本
-├── install.sh                  # 生产环境一键安装脚本
 ├── backend/                    # Spring Boot 后端
 │   ├── pom.xml
 │   └── src/main/java/org/sunyaxing/transflow/
@@ -209,17 +207,14 @@ public List<NodeParam> configParams() {
 ## 快速启动（开发）
 
 ```bash
-# 一键启动前后端
-./start.sh
-
-# 或分别启动
+# 分别启动
 cd backend && mvn spring-boot:run
 cd frontend && npm install && npm run dev
 ```
 
 | 服务 | 地址 |
 |------|------|
-| 后端 | http://localhost:8080 |
+| 后端 | http://localhost:18900 |
 | 前端 | http://localhost:5173 |
 
 ## 一键安装（生产）
@@ -256,7 +251,7 @@ sudo ./install.sh
 └── db/                              # JSON 文件持久化目录
 ```
 
-安装后通过 http://localhost:8080 直接访问，前后端同端口，无需额外代理。
+安装后通过 http://localhost:18900 直接访问，前后端同端口，无需额外代理。
 
 ## 环境依赖
 
