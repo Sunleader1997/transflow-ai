@@ -17,13 +17,24 @@ const routes = [
     props: true
   },
   {
+    path: '/workflows',
+    name: 'WorkflowList',
+    component: () => import('../views/WorkflowList.vue')
+  },
+  {
+    path: '/workflow/:templateId',
+    name: 'WorkflowEditor',
+    component: () => import('../views/WorkflowEditor.vue'),
+    props: true
+  },
+  {
     path: '/workflow/:templateId/history',
     name: 'ExecutionHistory',
     component: () => import('../views/ExecutionHistory.vue'),
     props: true
   },
   {
-    path: '/execution/:executionId',
+    path: '/workflow/execution/:executionId',
     name: 'ExecutionDetail',
     component: () => import('../views/ExecutionDetail.vue'),
     props: true
