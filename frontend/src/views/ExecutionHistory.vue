@@ -92,7 +92,7 @@ const createExecution = async () => {
     const { data } = await workflowExecutionApi.create(templateId)
     showToast('执行已创建')
     if (data?.id) {
-      router.push(`/execution/${data.id}`)
+      router.push(`/workflow/execution/${data.id}`)
     } else {
       loadData()
     }
@@ -102,7 +102,7 @@ const createExecution = async () => {
 }
 
 const goToDetail = (id) => {
-  router.push(`/execution/${id}`)
+  router.push(`/workflow/execution/${id}`)
 }
 
 const statusLabel = (status) => {
