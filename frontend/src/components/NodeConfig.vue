@@ -5,37 +5,64 @@
         <h3>节点配置 — {{ node.data.label }}</h3>
         <button class="close-btn" @click="$emit('close')">&times;</button>
       </div>
-      <div class="config-body">
-        <div class="form-group" v-for="param in params" :key="param.field">
-          <label>{{ param.label }}</label>
-          <input
-            v-if="param.type === 'text'"
-            v-model="localConfig[param.field]"
-            :placeholder="param.placeholder"
-          />
-          <textarea
-            v-else-if="param.type === 'textarea'"
-            v-model="localConfig[param.field]"
-            :placeholder="param.placeholder"
-            rows="4"
-          ></textarea>
-          <input
-            v-else-if="param.type === 'number'"
-            type="number"
-            v-model.number="localConfig[param.field]"
-            :placeholder="param.placeholder"
-          />
-          <select v-else-if="param.type === 'select'" v-model="localConfig[param.field]">
-            <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
-          </select>
-          <GroovyCodeEditor
-            v-else-if="param.type === 'code'"
-            v-model="localConfig[param.field]"
-            :placeholder="param.placeholder"
-            height="300px"
-          />
-          <div v-else-if="param.type === 'hint'" class="hint-text">{{ param.hint }}</div>
-          <p class="param-hint" v-if="param.hint && param.type !== 'hint'">{{ param.hint }}</p>
+      <div class="config-main">
+        <!-- 左侧：表单字段 -->
+        <div class="config-sidebar">
+          <div class="form-group" v-for="param in nonTextareaParams" :key="param.field">
+            <label>{{ param.label }}</label>
+            <input
+              v-if="param.type === 'text'"
+              v-model="localConfig[param.field]"
+              :placeholder="param.placeholder"
+            />
+            <input
+              v-else-if="param.type === 'number'"
+              type="number"
+              v-model.number="localConfig[param.field]"
+              :placeholder="param.placeholder"
+            />
+            <select v-else-if="param.type === 'select'" v-model="localConfig[param.field]">
+              <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
+            <GroovyCodeEditor
+              v-else-if="param.type === 'code'"
+              v-model="localConfig[param.field]"
+              :placeholder="param.placeholder"
+              height="200px"
+            />
+            <div v-else-if="param.type === 'hint'" class="hint-text">{{ param.hint }}</div>
+            <p class="param-hint" v-if="param.hint && param.type !== 'hint'">{{ param.hint }}</p>
+          </div>
+
+          <!-- textarea 字段导航 -->
+          <div v-if="textareaParams.length > 0" class="textarea-nav">
+            <div class="textarea-nav-title">文本字段</div>
+            <div
+              v-for="param in textareaParams"
+              :key="param.field"
+              class="textarea-nav-item"
+              :class="{ active: activeTextarea === param.field }"
+              @click="activeTextarea = param.field"
+            >
+              {{ param.label }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧：Markdown 编辑器 -->
+        <div class="config-editor">
+          <div v-if="activeTextareaParam" class="editor-wrapper">
+            <MarkdownEditor
+              v-model="localConfig[activeTextarea]"
+              :placeholder="activeTextareaParam.placeholder"
+            />
+          </div>
+          <div v-else-if="textareaParams.length === 0 && nonTextareaParams.length === 0" class="editor-empty">
+            该节点无配置项
+          </div>
+          <div v-else-if="textareaParams.length === 0" class="editor-empty">
+            该节点无文本字段，请在左侧配置参数
+          </div>
         </div>
       </div>
       <div v-if="compileError" class="compile-error">
@@ -54,9 +81,10 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { flowApi, groovyApi } from '../api/index.js'
 import GroovyCodeEditor from './GroovyCodeEditor.vue'
+import MarkdownEditor from './MarkdownEditor.vue'
 
 const props = defineProps(['node', 'configParams'])
 const emit = defineEmits(['close', 'save'])
@@ -65,11 +93,22 @@ const localConfig = ref({ ...props.node.data.config })
 const params = ref([])
 const compiling = ref(false)
 const compileError = ref('')
+const activeTextarea = ref('')
+
+const nonTextareaParams = computed(() => params.value.filter(p => p.type !== 'textarea'))
+const textareaParams = computed(() => params.value.filter(p => p.type === 'textarea'))
+const activeTextareaParam = computed(() => textareaParams.value.find(p => p.field === activeTextarea.value))
 
 watch(() => props.node, (n) => {
   if (n) {
     localConfig.value = { ...n.data.config }
     compileError.value = ''
+  }
+}, { immediate: true })
+
+watch(textareaParams, (list) => {
+  if (list.length > 0 && (!activeTextarea.value || !list.find(p => p.field === activeTextarea.value))) {
+    activeTextarea.value = list[0].field
   }
 }, { immediate: true })
 
@@ -87,10 +126,8 @@ const fillDefaults = (config, paramList) => {
   return filled
 }
 
-// Fetch config params from backend for this node type
 const loadParams = async () => {
   try {
-    // Get the task ID from the route
     const taskId = window.location.hash.split('/').pop()
     const { data } = await flowApi.get(taskId)
     if (data?.flow?.nodes) {
@@ -102,9 +139,8 @@ const loadParams = async () => {
       }
     }
   } catch (e) {
-    // fallback to default params
+    // fallback
   }
-  // Default params based on node type
   const defaults = getDefaultParams(props.node.data.type)
   params.value = defaults
   localConfig.value = fillDefaults(localConfig.value, defaults)
@@ -113,7 +149,7 @@ const loadParams = async () => {
 const getDefaultParams = (type) => {
   const defaults = {
     'TXT-INPUT': [
-      { field: 'text', label: '输入文本', type: 'textarea', defaultValue: '', placeholder: '输入文本内容' }
+      { field: 'text', label: '输入文本', type: 'textarea', defaultValue: '', placeholder: '输入文本内容，支持 Markdown' }
     ],
     'KAFKA-CONSUMER': [
       { field: 'bootstrapServers', label: 'Bootstrap Servers', type: 'text', defaultValue: 'localhost:9092', placeholder: 'localhost:9092' },
@@ -203,25 +239,34 @@ loadParams()
 </script>
 
 <style scoped>
-.config-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; }
-.config-panel { background: #fff; border-radius: 12px; width: 680px; max-width: 90vw; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
-.config-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.config-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.config-panel { background: #fff; width: 95vw; height: 90vh; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 12px 48px rgba(0,0,0,0.25); overflow: hidden; }
+.config-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .config-header h3 { font-size: 16px; }
-.close-btn { border: none; background: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); }
-.config-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
-.config-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+.close-btn { border: none; background: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); line-height: 1; }
+.config-main { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.config-sidebar { width: 280px; min-width: 280px; border-right: 1px solid var(--border); padding: 16px 16px 16px 20px; overflow-y: auto; background: #fafbfc; }
+.config-editor { flex: 1; min-width: 0; padding: 16px 20px 16px 16px; overflow: hidden; display: flex; flex-direction: column; }
+.editor-wrapper { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.editor-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #999; font-size: 14px; }
+.config-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .form-group { margin-bottom: 14px; }
 .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-.form-group input, .form-group textarea, .form-group select {
-  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none;
+.form-group input, .form-group select {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; box-sizing: border-box;
 }
-.form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--primary); }
+.form-group input:focus, .form-group select:focus { border-color: var(--primary); }
 .param-hint { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
 .hint-text { font-size: 13px; color: var(--text-secondary); font-style: italic; padding: 8px; background: #f9fafb; border-radius: 6px; }
-.btn { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; background: #fff; }
+.textarea-nav { margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--border); }
+.textarea-nav-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+.textarea-nav-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #555; transition: all 0.15s; margin-bottom: 4px; }
+.textarea-nav-item:hover { background: #e9ecef; }
+.textarea-nav-item.active { background: #1976d2; color: #fff; }
+.btn { padding: 8px 20px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; background: #fff; }
 .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.compile-error { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #fef2f2; border-top: 1px solid #fecaca; color: #b91c1c; font-size: 12px; }
+.compile-error { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #fef2f2; border-top: 1px solid #fecaca; color: #b91c1c; font-size: 12px; flex-shrink: 0; }
 .error-icon { font-size: 14px; }
 .error-text { white-space: pre-wrap; word-break: break-all; }
 </style>

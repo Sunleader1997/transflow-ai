@@ -50,22 +50,25 @@
     </div>
 
     <div class="modal-overlay" v-if="editNode" @click.self="editNode = null">
-      <div class="modal">
-        <h2>编辑节点</h2>
-        <form @submit.prevent="saveNodeEdit">
-          <div class="form-group">
+      <div class="modal modal-fullscreen">
+        <div class="modal-header">
+          <h2>编辑节点</h2>
+          <button class="close-btn" @click="editNode = null">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group title-group">
             <label>标题</label>
             <input v-model="editForm.title" required placeholder="节点标题" />
           </div>
-          <div class="form-group">
+          <div class="form-group editor-group">
             <label>描述</label>
-            <textarea v-model="editForm.description" placeholder="节点描述" rows="3"></textarea>
+            <MarkdownEditor v-model="editForm.description" placeholder="节点描述，支持 Markdown 语法" />
           </div>
-          <div class="form-actions">
-            <button type="button" class="btn" @click="editNode = null">取消</button>
-            <button type="submit" class="btn btn-primary">保存</button>
-          </div>
-        </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" @click="editNode = null">取消</button>
+          <button type="button" class="btn btn-primary" @click="saveNodeEdit">保存</button>
+        </div>
       </div>
     </div>
   </div>
@@ -80,6 +83,7 @@ import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
 import { workflowTemplateApi } from '../api/workflow.js'
 import WorkflowNode from '../components/WorkflowNode.vue'
+import MarkdownEditor from '../components/MarkdownEditor.vue'
 import { useToast } from '../composables/useToast.js'
 
 const route = useRoute()
@@ -222,14 +226,24 @@ onMounted(loadTemplate)
 .btn { padding: 10px 20px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 14px; background: #fff; }
 .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn-primary:hover { opacity: 0.9; }
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal-overlay { position: fixed; top: 28px; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .modal { background: #fff; border-radius: 12px; padding: 28px; width: 420px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
-.modal h2 { margin-bottom: 20px; font-size: 20px; }
+.modal-fullscreen { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; border-radius: 0; padding: 0; display: flex; flex-direction: column; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.modal-header h2 { font-size: 18px; margin: 0; }
+.modal-body { flex: 1; min-height: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.title-group { flex-shrink: 0; }
+.title-group input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box; }
+.title-group input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+.editor-group { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.editor-group label { display: block; margin-bottom: 6px; font-size: 14px; color: var(--text-secondary); }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; margin-bottom: 6px; font-size: 14px; color: var(--text-secondary); }
 .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; }
 .form-group input:focus, .form-group textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.close-btn { border: none; background: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); line-height: 1; }
 .toast-bar { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 200; padding: 10px 28px; border-radius: 0 0 8px 8px; font-size: 14px; font-weight: 500; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
 .toast-bar.success { background: #4caf50; color: #fff; }
 .toast-bar.error { background: #f44336; color: #fff; }
